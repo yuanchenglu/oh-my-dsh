@@ -66,21 +66,16 @@ read_file ~/Code/oh-my-dsh/docs/04-testing.md
 4. **API 签名以架构文档为准**（已从 dsh v0.1.0-rc.5 源码验证），不要猜
 5. **测试先行**：每个插件写完核心逻辑后立刻写测试，全部通过再写插件入口
 
-### dsh 官方仓库参考
+### 参考路径（备查，正常流程不要读）
 
-本地路径：~/Code/deepseek-src/deepseek-harness（v0.1.0-rc.5）
-- 插件 API 示例：packages/core/agent-loop/src/invariant.ts（llm/stream 挂钩）
-- agent/pre-step 示例：packages/compaction/compaction-basic/src/index.ts:147
-- 插件教程：docs/user/develop/basic/index.md
-- Config Schema：docs/user/develop/basic/config.md
+四套文档已自包含：所有代码片段、测试用例、API 签名都已内联，**直接复制即可，不需要读以下任何文件**。以下路径仅用于两种异常场景：
+1. M4 安装验证时，需要对 dsh 仓库**执行命令**（`pnpm dsh web --patch ...`），不是阅读
+2. 行为与文档预期不符时，对照 dsh 官方示例调试
 
-### oh-my-deepseek-harness 设计源头参考
+如果文档与以下源码冲突，**以文档为准**（文档已从 dsh v0.1.0-rc.5 源码逐一验证）。
 
-本地路径：~/Code/deepseek-src/oh-my-deepseek-harness
-- intent_router.py：packages/platform_core/intent_router.py
-- strategies.yaml：packages/platform_core/strategies.yaml
-- gate.py：packages/platform_core/gate.py
-- reasoning_effort.py：src/deepseek_harness/reasoning_effort.py
+dsh 官方仓库：~/Code/deepseek-src/deepseek-harness
+oh-my 设计源头：~/Code/deepseek-src/oh-my-deepseek-harness
 
 ---
 
