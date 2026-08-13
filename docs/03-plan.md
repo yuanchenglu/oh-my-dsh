@@ -552,3 +552,15 @@ export function checkAgainstConstraints(
 | options.messages 冻结导致修改失败 | 低 | 架构文档已注明需创建新数组 |
 | 意图分类准确率不足 | 中 | fixture 覆盖，Config 允许自定义关键词 |
 | 子代理间文件冲突 | 低 | 各自独立目录，shared/types.ts 由 M0 预先创建 |
+
+## 10. 技术债务（已知未覆盖）
+
+以下 12 个创新点未纳入 v0.1 规划，原因分三类：
+
+| 类别 | 创新点 | 原因 | 解锁条件 |
+|---|---|---|---|
+| dsh 已有等价物 | I-03 注意力预算 / I-04 KV Cache / I-13 Byte Stability | 官方已做，需想清楚差异化再动手 | 读完官方 compaction/prefix 源码后评估 |
+| 需要 dsh 深层 API | I-06 PlanGraph / I-11 Checkpoint / I-12 Memory 编译 | 官方开发文档未覆盖 plan/memory/session 服务的插件接口 | 读 dsh 源码中对应服务的 inject/provide 接口 |
+| 平台能力差异 | I-14 Reasoning Replay / I-07 审查路由 | Hermes 特有 hook，需确认 dsh 等价挂钩点 | 读 dsh 源码确认是否有等价事件 |
+
+**处理策略**：v0.1 先跑通 3 个插件（intent-router / cognition-gate / constraint-immune），同时并行读 dsh 源码补全剩余 12 个的映射规划，出 v0.2 规划文档。
