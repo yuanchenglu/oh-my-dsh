@@ -2,7 +2,6 @@
   "name": "oh-my-dsh",
   "version": "0.1.0",
   "type": "module",
-  "main": "src/index.ts",
   "files": [
     "src",
     "lib",
@@ -22,5 +21,10 @@
     "@types/node": "^26.2.0",
     "typescript": "^5.5.0",
     "vitest": "^3.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-tools": "*",
+    "@deepseek-ai/schemastery": "*"
   }
 }
