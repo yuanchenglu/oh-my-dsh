@@ -3,3 +3,5 @@ lib/
 dist/
 *.tgz
 .DS_Store
+.omo/
+.omc/
