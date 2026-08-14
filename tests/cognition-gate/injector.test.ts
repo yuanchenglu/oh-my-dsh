@@ -35,6 +35,17 @@ describe('buildInjection', () => {
     expect(result).toContain('[I-08 范围控制]')
   })
 
+  it('turn=1 单层关闭时其余层仍注入（Y2 回归）', () => {
+    const config: InjectionConfig = {
+      layers: { l1: true, l2: false, i02: true, i08: true },
+      excludePatterns: [],
+    }
+    const result = buildInjection(1, config)
+    expect(result).toContain('[L1]')
+    expect(result).not.toContain('[L2]')
+    expect(result).toContain('[I-08]')
+  })
+
   it('filters out all layers when all disabled', () => {
     const config: InjectionConfig = {
       layers: { l1: false, l2: false, i02: false, i08: false },
@@ -92,11 +103,15 @@ describe('injectCognition', () => {
     expect(result).toEqual(messages)
   })
 
-  it('handles non-string content by serializing', () => {
-    const messages = [{ role: 'user', content: [{ type: 'text', text: '多模态' }] }]
+  it('ContentBlock[] content 追加 text part，保持数组结构（Y4）', () => {
+    const messages = [{ role: 'user', content: [{ type: 'text', text: '多模态' }, { type: 'image', url: 'x' }] }]
     const result = injectCognition(messages, 0, allOn)
-    const content = (result[0] as { content: string }).content
-    expect(content).toContain('多模态')
-    expect(content).toContain('[L1 荣辱观]')
+    const content = (result[0] as { content: Array<{ type: string; text?: string }> }).content
+    expect(Array.isArray(content)).toBe(true)
+    expect(content).toHaveLength(3)
+    expect(content[0]).toEqual({ type: 'text', text: '多模态' })
+    expect(content[1]).toEqual({ type: 'image', url: 'x' })
+    expect(content[2].type).toBe('text')
+    expect(content[2].text).toContain('[L1 荣辱观]')
   })
 })

@@ -4,8 +4,10 @@ export const FULL_INJECTION = `[L1 荣辱观] 以知道自己的不足为荣、�
 [I-02 双向原语] 可用 /propose_skill 提议固化 Skill，/trigger_self_review 请求审查。
 [I-08 范围控制] 不得超出用户显式声明范围。"不加步骤能完成 = 范围蔓延，拒绝"。`
 
-/** 后续轮精简注入文本 */
-export const BRIEF_INJECTION = `[L1] 不确定就说不确定。[L2] 假设先行。[I-08] 不加步骤能完成 = 拒绝。`
+/** 后续轮精简注入文本（每个层标记独占一行，filterLayers 才能按行过滤——review Y2） */
+export const BRIEF_INJECTION = `[L1] 不确定就说不确定。
+[L2] 假设先行。
+[I-08] 不加步骤能完成 = 拒绝。`
 
 /** 注入配置 */
 export interface InjectionConfig {
@@ -43,6 +45,17 @@ function matchesExcludePattern(content: string, patterns: string[]): boolean {
   return patterns.some((pattern) => content.includes(pattern))
 }
 
+/** content 拍平为纯文本（仅用于排除模式匹配） */
+function contentToText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (part && typeof part === 'object' && 'text' in part ? String((part as { text: unknown }).text) : ''))
+      .join('')
+  }
+  return ''
+}
+
 /** 认知注入：在最后一条用户消息末尾追加注入文本，返回新数组 */
 export function injectCognition(
   messages: readonly unknown[],
@@ -56,12 +69,15 @@ export function injectCognition(
   for (let i = result.length - 1; i >= 0; i--) {
     const msg = result[i] as { role?: string; content?: unknown }
     if (msg.role === 'user') {
-      const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content ?? '')
-      if (matchesExcludePattern(content, config.excludePatterns)) {
+      if (matchesExcludePattern(contentToText(msg.content), config.excludePatterns)) {
         return result
       }
-      const newContent = content + '\n\n' + injection
-      result[i] = { ...msg, content: newContent }
+      // ContentBlock[] 保持数组结构、追加 text part（review Y4：JSON.stringify 会把图片 part 拍成文本）
+      if (Array.isArray(msg.content)) {
+        result[i] = { ...msg, content: [...msg.content, { type: 'text', text: '\n\n' + injection }] }
+      } else {
+        result[i] = { ...msg, content: contentToText(msg.content) + '\n\n' + injection }
+      }
       return result
     }
   }
