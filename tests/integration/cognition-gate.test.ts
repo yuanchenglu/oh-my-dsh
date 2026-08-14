@@ -13,11 +13,16 @@ function createMockCtx() {
     effect: vi.fn(),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     _listeners: listeners,
-    _preStep: async (payload: { messages: unknown[]; turn: number; aborted?: boolean }) => {
+    _preStep: async (payload: { messages: unknown[]; turn: number; aborted?: boolean; systemContext?: unknown }) => {
       const controller = new AbortController()
       if (payload.aborted) controller.abort()
       const full = { messages: payload.messages, turn: payload.turn, step: 0, signal: controller.signal }
-      const next = vi.fn().mockResolvedValue({ kind: 'enter', messages: payload.messages })
+      const next = vi.fn().mockResolvedValue({
+        kind: 'enter',
+        messages: payload.systemContext === undefined
+          ? payload.messages
+          : [...payload.messages, payload.systemContext],
+      })
       const results = []
       for (const fn of listeners['agent/pre-step'] || []) results.push(await fn(full, next))
       return { next, results }
@@ -44,7 +49,7 @@ describe('cognition-gate plugin', () => {
       messages: [{ role: 'user', content: '帮我写代码' }],
       turn: 0,
     })
-    expect(next).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalledTimes(1)
     const messages = results[0].messages as Array<{ role: string; content: string }>
     expect(messages).toHaveLength(1)
     expect(messages[0].content).toContain('帮我写代码')
@@ -66,6 +71,23 @@ describe('cognition-gate plugin', () => {
     expect(messages[0].content).toContain('[L2]')
     expect(messages[0].content).toContain('[I-08]')
     expect(messages[0].content).not.toContain('[I-02 双向原语]')
+  })
+
+  it('preserves dsh system context returned by next while injecting cognition', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as never, defaultConfig)
+    const systemContext = { role: 'user', content: '[dsh system context]' }
+    const { next, results } = await ctx._preStep({
+      messages: [{ role: 'user', content: '帮我写代码' }],
+      turn: 0,
+      systemContext,
+    })
+
+    expect(next).toHaveBeenCalledTimes(1)
+    const messages = results[0].messages as Array<{ role: string; content: string }>
+    expect(messages).toHaveLength(2)
+    expect(messages[1]!.content).toContain('[dsh system context]')
+    expect(messages[1]!.content).toContain('[L1 荣辱观]')
   })
 
   it('单层关闭时其余层仍注入（turn=1，Y2 回归）', async () => {

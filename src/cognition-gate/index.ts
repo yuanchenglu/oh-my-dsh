@@ -28,7 +28,8 @@ export function apply(ctx: Context, config: Config) {
     signal: AbortSignal
   }, next: () => Promise<PreStepDecision>): Promise<PreStepDecision> => {
     if (signal.aborted) return next()
-    const injected = injectCognition(messages, turn, config)
-    return { kind: 'enter', messages: injected }
+    const decision = await next()
+    if (decision.kind === 'reject' || signal.aborted) return decision
+    return { kind: 'enter', messages: injectCognition(decision.messages, turn, config) }
   })
 }
