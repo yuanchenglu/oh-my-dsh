@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { apply, Config } from '../../src/intent-router/index.js'
 
-/** 简化 mock：仅包含测试需要的 on/effect */
+/** 简化 mock：捕获 agent/request listener，模拟 cordis waterfall 的 unwind 替换语义 */
 function createMockCtx() {
   const listeners: Record<string, Function[]> = {}
   return {
@@ -12,11 +12,19 @@ function createMockCtx() {
     effect: vi.fn(),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     _listeners: listeners,
-    _emitWaterfall: async (event: string, payload: any) => {
-      const fns = listeners[event] || []
-      const next = vi.fn().mockResolvedValue({ kind: 'enter', messages: payload.messages ?? [] })
-      for (const fn of fns) await fn(payload, next)
-      return next
+    /** 模拟 agent/request 瀑布：seed 配置经 listener 链 unwind 后返回最终配置 */
+    _dispatchRequest: async (messages: Array<{ role: string; content: unknown }>, seed: Record<string, unknown> = { provider: 'deepseek', model: 'deepseek-v4-flash' }) => {
+      const payload = {
+        agent: { session: { deriveMessages: () => messages } },
+        turn: 0,
+        step: 0,
+        signal: new AbortController().signal,
+      }
+      const fns = listeners['agent/request'] || []
+      const next = vi.fn().mockResolvedValue(seed)
+      let result: any = seed
+      for (const fn of fns) result = await fn(payload, next)
+      return { result, next }
     },
   }
 }
@@ -34,21 +42,41 @@ const defaultConfig = {
 }
 
 describe('intent-router plugin', () => {
-  it('registers llm/stream listener', () => {
+  it('registers agent/request listener', () => {
     const ctx = createMockCtx()
     apply(ctx as any, defaultConfig)
-    expect(ctx.on).toHaveBeenCalledWith('llm/stream', expect.any(Function))
+    expect(ctx.on).toHaveBeenCalledWith('agent/request', expect.any(Function))
   })
 
-  it('sets reasoningEffort for architecture intent', async () => {
+  it('sets reasoningEffort=max for architecture intent', async () => {
     const ctx = createMockCtx()
     apply(ctx as any, defaultConfig)
-    const options = {
-      messages: [{ role: 'user', content: '设计一个微服务架构' }],
-      model: 'deepseek-v4-flash',
-    }
-    const next = await ctx._emitWaterfall('llm/stream', options)
-    expect(next).toHaveBeenCalled()
+    const { result } = await ctx._dispatchRequest([{ role: 'user', content: '设计一个微服务架构' }])
+    expect(result.reasoningEffort).toBe('max')
+  })
+
+  it('sets reasoningEffort=high for refactor intent', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, defaultConfig)
+    const { result } = await ctx._dispatchRequest([{ role: 'user', content: '重构这个模块拆分逻辑' }])
+    expect(result.reasoningEffort).toBe('high')
+  })
+
+  it('keeps seed config when no keyword matches (spec_driven fallback)', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, defaultConfig)
+    const seed = { provider: 'deepseek', model: 'deepseek-v4-flash', reasoningEffort: 'low' }
+    const { result } = await ctx._dispatchRequest([{ role: 'user', content: '你好' }], seed)
+    expect(result).toEqual(seed)
+  })
+
+  it('reads text from ContentBlock[] user messages', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, defaultConfig)
+    const { result } = await ctx._dispatchRequest([
+      { role: 'user', content: [{ type: 'text', text: '设计一个微服务架构' }] },
+    ])
+    expect(result.reasoningEffort).toBe('max')
   })
 
   it('does not register when disabled', () => {
