@@ -171,21 +171,19 @@ function createMockCtx() {
 }
 
 describe('intent-router plugin', () => {
-  it('registers llm/stream listener', () => {
+  it('registers agent/request listener', () => {
     const ctx = createMockCtx()
     apply(ctx as any, defaultConfig)
-    expect(ctx.on).toHaveBeenCalledWith('llm/stream', expect.any(Function))
+    expect(ctx.on).toHaveBeenCalledWith('agent/request', expect.any(Function))
   })
 
-  it('sets reasoningEffort for architecture intent', async () => {
+  it('sets reasoningEffort=max for architecture intent', async () => {
     const ctx = createMockCtx()
     apply(ctx as any, defaultConfig)
-    const options = {
-      messages: [{ role: 'user', content: '设计一个微服务架构' }],
-      model: 'deepseek-v4-flash',
-    }
-    const next = await ctx._emitWaterfall('llm/stream', options)
-    expect(next).toHaveBeenCalled()
+    const { result } = await ctx._dispatchRequest([
+      { role: 'user', content: '设计一个微服务架构' },
+    ])
+    expect(result.reasoningEffort).toBe('max')
   })
 })
 
@@ -218,6 +216,10 @@ describe('cognition-gate plugin', () => {
 ## 5. E2E 测试
 
 ### 5.1 安装验证（install.test.ts）
+
+> **状态：未实施，列入 v0.2 计划。** 当前 `tests/e2e/install.test.ts` 只做静态结构断言
+> （patch 文件、dsh.bundle 字段、编译产物存在性），不执行真实安装与 API 验证。
+> 以下为 v0.2 目标流程。
 
 **前提**：dsh 官方仓库已 clone，`pnpm install` 已完成。
 
@@ -252,6 +254,8 @@ pnpm vitest
 
 ### 6.2 CI（GitHub Actions）
 
+> **状态：待建。** 仓库尚无 `.github/` 目录，以下为目标模板。
+
 ```yaml
 # .github/workflows/ci.yml
 name: CI
@@ -272,6 +276,8 @@ jobs:
 **通过条件**：typecheck 0 错误 + 全部测试通过。
 
 ## 7. 覆盖率目标
+
+> **状态：目标声明，暂无量测门禁**（vitest 未配置 coverage，CI 待建）。
 
 | 模块 | 目标 | 说明 |
 |---|---|---|

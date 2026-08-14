@@ -12,10 +12,10 @@ oh-my-dsh 是 dsh（DeepSeek Harness）的一个 **bundle**——一个 npm 包�
 ```
 用户 profile 配置树（cordis.yml）
   └── - include: oh-my-dsh/cordis.patch.yml   ← bundle 层（本仓库提供）
-        ├── intent-router 插件（agent/pre-step + llm/stream）
+        ├── intent-router 插件（agent/request）
         ├── cognition-gate 插件（agent/pre-step）
-        ├── constraint-immune 插件（agent/pre-step + tools/pre-execute）
-        └── model-router 插件（llm/stream，v0.2）
+        ├── constraint-immune 插件（agent/pre-step；tools/* 拦截列入 v0.2）
+        └── model-router 插件（v0.2）
 ```
 
 ### 1.2 技术栈
@@ -82,10 +82,11 @@ oh-my-dsh/
 import type { Context } from '@deepseek-ai/cordis'
 
 export const name = 'intent-router'
-export const inject = ['llm']  // 声明依赖：等待 llm 服务就绪
+// v0.1 不声明 inject：实测 inject: ['llm'] 会导致 profile 启动挂起
+// （cordis 等待服务就绪与加载顺序死锁）。本 bundle 只用事件挂钩，
+// 事件监听器在服务注册前挂上即可正常触发，无需 inject。
 
 export function apply(ctx: Context, config: Config) {
-  // ctx.llm 已就绪（因 inject 声明）
   // 在这里注册事件监听
 }
 ```
@@ -131,7 +132,7 @@ ctx.on('agent/pre-step', async ({ agent, messages, turn, signal }, next): Promis
 })
 ```
 
-#### llm/stream（瀑布事件，可改写 LLM 调用参数）
+#### llm/stream（瀑布事件，包裹 LLM 调用流）
 
 ```ts
 // 精确签名（packages/llm/llm/src/index.ts:64）
@@ -160,26 +161,40 @@ function extractLastUserMessage(messages: readonly unknown[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i] as { role?: string; content?: unknown }
     if (msg.role === 'user') {
-      return typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+      if (typeof msg.content === 'string') return msg.content
+      if (Array.isArray(msg.content)) {
+        return msg.content.map((p: any) => (p?.type === 'text' ? p.text : '')).join('')
+      }
     }
   }
   return ''
 }
 ```
 
-**用法**：intent-router 挂钩此事件，按意图分类结果改写 `options.reasoningEffort`。
+**注意（v0.1 review R1 实测）**：agent-loop 派发前对 request 做 `deepFreeze`，且 cordis waterfall 的 `next()` 不透传参数（listener 共享同一个 options 引用，重新赋值会被丢弃，原地 mutate 会抛错）。**不能在此事件改写 reasoningEffort**——改写调用配置请用下面的 `agent/request`。
+
+#### agent/request（瀑布事件，dsh 设计的调用配置改写通道）
 
 ```ts
-// intent-router 插件中的挂钩示例（已验证写法，参考 invariant.ts）
-ctx.on('llm/stream', (options: GenerateOptions, next) => {
-  const lastMsg = extractLastUserMessage(options.messages)
+// 精确签名（packages/core/agent/src/runtime-types.ts:244）
+'agent/request'(
+  this: Scoped<Agent>,
+  payload: { agent: Agent; turn: number; step: number; signal: AbortSignal },
+  next: () => Promise<LlmCallConfig>
+): Promise<LlmCallConfig>
+```
+
+listener 在 unwind 阶段返回修改后的 config，agent-loop 会把变更记入 `request/header` 快照（packages/core/agent-loop/src/agent.ts buildRequest）。
+
+```ts
+// intent-router 插件中的挂钩示例（已验证写法）
+ctx.on('agent/request', async ({ agent, signal }, next) => {
+  const callConfig = await next()
+  if (signal.aborted) return callConfig
+  const lastMsg = extractLastUserMessage(agent.session.deriveMessages())
   const { intent } = classifyIntent(lastMsg, strategies)
   const effort = config.effortMap[intent]
-  if (effort) {
-    // options 是冻结的，需要创建新对象
-    options = Object.freeze({ ...options, reasoningEffort: effort })
-  }
-  return next()
+  return effort ? { ...callConfig, reasoningEffort: effort } : callConfig
 })
 ```
 
@@ -287,9 +302,8 @@ function classifyIntent(text, strategies):
 
   ranked = sort scores by value descending
   best = ranked[0], second = ranked[1] or 0
-  confidence = best / (best + second)
+  confidence = best / (best + second)  // 恒 ≥ 0.5，仅作观测值
 
-  if confidence < 0.5: return { intent: 'spec_driven', confidence }
   return { intent: best.name, confidence }
 
 function keywordMatchScore(keyword, text):
@@ -344,22 +358,29 @@ export function buildInjection(turn: number, config: InjectionConfig): string
 **核心函数**（从 gate.py extract_hard_constraints + immune_audit.py 移植）：
 
 ```ts
-// 硬约束正则（从 gate.py 移植）
-const HARD_CONSTRAINT_RE = /(?:不能|不要|不得|禁止|严禁|不允许|千万别|绝对不|必须)[^，。；、！？\n]{2,60}/g
+// 约束分两类：否定型（不能/不要/禁止…）命中算违规；肯定型（必须…）只记录不判定
+export interface Constraint {
+  raw: string      // 约束原文（含前缀）
+  keyword: string  // 去掉前缀后的关键词
+  kind: 'negative' | 'positive'
+}
 
-export function extractHardConstraints(userMessage: string): Set<string>
+// customPatterns：用户自定义约束前缀，按否定型处理
+export function extractHardConstraints(
+  userMessage: string,
+  customPatterns?: string[]
+): Constraint[]
 
-// 插件内部状态：会话级硬约束集合
-// 每次 agent/pre-step 时从新消息中提取并合并
-
-// 执行前检查：将待检查文本与硬约束比对
+// 只判定否定型约束
 export function checkAgainstConstraints(
   text: string,
-  constraints: Set<string>
+  constraints: Iterable<Constraint>
 ): { violated: boolean; matched?: string }
 ```
 
-**检查逻辑**：在 `agent/pre-step` 中，将模型即将看到的 messages 文本与硬约束集合比对。若模型上一轮输出涉及硬约束关键词，在 messages 中追加约束提醒。
+**插件内部状态**：`Map<sessionId, { constraints, checkedUpTo }>`；sessionId 取 `payload.agent.id`（拿不到则退化为单桶）。每条约束记录首次出现的消息下标。
+
+**检查逻辑**：在 `agent/pre-step` 中，只把"约束首次出现之后、上一轮检查之后"的新 assistant 消息与否定型约束比对，命中则在 messages 末尾追加约束提醒。不拼全部历史（用户约束原文会自我触发），提醒文本不参与再提取（避免自我复制）。
 
 ### 3.4 bundle 层：cordis.patch.yml
 
@@ -367,17 +388,17 @@ export function checkAgainstConstraints(
 # oh-my-dsh bundle：一次 insert 全部插件
 - insert:
     - id: intent-router
-      name: oh-my-dsh/intent-router
+      name: oh-my-dsh/lib/src/intent-router/index.js   # 指向编译产物（tsconfig include 含 src+tests，输出落在 lib/src/）
       config:
         enabled: true
 
     - id: cognition-gate
-      name: oh-my-dsh/cognition-gate
+      name: oh-my-dsh/lib/src/cognition-gate/index.js
       config:
         layers: { l1: true, l2: true, i02: true, i08: true }
 
     - id: constraint-immune
-      name: oh-my-dsh/constraint-immune
+      name: oh-my-dsh/lib/src/constraint-immune/index.js
       config:
         enabled: true
 ```
@@ -388,10 +409,10 @@ export function checkAgainstConstraints(
 
 | 维度 | oh-my (Python/Hermes) | oh-my-dsh (TS/dsh) |
 |---|---|---|
-| 推理强度控制 | 文本提示注入（hook 限制） | 直接设置 reasoningEffort API 参数 |
+| 推理强度控制 | 文本提示注入（hook 限制） | agent/request 瀑布改写 reasoningEffort 调用配置 |
 | 认知注入位置 | pre_llm_call hook | agent/pre-step 瀑布事件 |
 | 硬约束检查 | immune_audit.py（执行后） | agent/pre-step（生成前预防） |
 | 安装方式 | install.sh 脚本 | dsh plugin add（npm 包） |
 | 配置方式 | YAML 文件 | Config Schema + cordis.yml |
 
-**DSH 版更强的原因**：dsh 的 `llm/stream` 瀑布允许直接改写 API 参数（reasoningEffort），而 Hermes 的 pre_llm_call hook 只能注入文本。这是平台能力差异带来的升级。
+**DSH 版更强的原因**：dsh 的 `agent/request` 瀑布允许直接改写调用配置（reasoningEffort），而 Hermes 的 pre_llm_call hook 只能注入文本。这是平台能力差异带来的升级。

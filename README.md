@@ -14,7 +14,7 @@ dsh plugin add oh-my-dsh
 
 | 插件 | 功能 | 挂钩点 |
 |------|------|--------|
-| **intent-router** | 意图分类 → 自动设置 reasoningEffort | `llm/stream` |
+| **intent-router** | 意图分类 → 自动设置 reasoningEffort | `agent/request` |
 | **cognition-gate** | 每轮注入认知导航（L1/L2/L3） | `agent/pre-step` |
 | **constraint-immune** | 提取并强制执行用户硬约束 | `agent/pre-step` |
 

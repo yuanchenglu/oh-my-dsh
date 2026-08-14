@@ -91,14 +91,14 @@ oh-my-dsh bundle 内部包含 4 个小插件（小颗粒、可独立禁用）：
 | refactor / new / medium | high |
 | simple / spec_driven | （不设置，用模型默认） |
 
-**DSH 挂钩点**：`llm/stream` 瀑布事件——在 `next()` 调用前改写 `options.reasoningEffort`。
+**DSH 挂钩点**：`agent/request` 瀑布事件——`await next()` 拿到下游调用配置后，在 unwind 阶段返回 `{ ...config, reasoningEffort }`。（v0.1 review R1：`llm/stream` 的 options 被 agent-loop deepFreeze 且 waterfall 的 `next()` 不透传参数，无法在该事件改写 reasoningEffort；`agent/request` 是 dsh 设计的配置改写通道，变更会被 loop 记入 request/header 快照。）
 
-**验收标准**（每条 AC 对应测试文件+用例编号，见测试体系文档）：
-- AC-1：输入"帮我重构这个模块"→ intent=refactor, reasoningEffort=high（对应测试：classifier.test.ts fixtures[0]）
-- AC-2：输入"设计一个微服务架构"→ intent=architecture, reasoningEffort=max（对应测试：classifier.test.ts fixtures[11]）
-- AC-3：输入"修复这个 typo"→ intent=simple, reasoningEffort 不设置（对应测试：classifier.test.ts fixtures[17]）
-- AC-4：输入无关键词文本 → intent=spec_driven, reasoningEffort 不设置（对应测试：classifier.test.ts fixtures[19]）
-- AC-5：置信度 < 0.5 时回退 spec_driven（对应测试：classifier.test.ts fixtures[19-21] + 专项测试）
+**验收标准**（每条 AC 按 fixtures 输入文本引用对应测试，避免编号漂移）：
+- AC-1：输入"帮我重构这个模块，拆分成更小的函数"→ intent=refactor, reasoningEffort=high（对应测试：classifier.test.ts fixtures「帮我重构这个模块，拆分成更小的函数」）
+- AC-2：输入"设计一个微服务架构方案"→ intent=architecture, reasoningEffort=max（对应测试：classifier.test.ts fixtures「设计一个微服务架构方案」）
+- AC-3：输入"修复这个 typo"→ intent=simple, reasoningEffort 不设置（对应测试：classifier.test.ts fixtures「修复这个 typo」）
+- AC-4：输入无关键词文本 → intent=spec_driven, reasoningEffort 不设置（对应测试：classifier.test.ts fixtures「你好」「the」）
+- AC-5：无任何关键词命中时回退 spec_driven（对应测试：classifier.test.ts fixtures「你好」「the」「」（空输入）+ 专项测试；注：confidence = best/(best+second) 数学上恒 ≥ 0.5，不存在"低置信度回退"边界）
 
 ### 3.3 P0-2：cognition-gate 插件
 
@@ -116,8 +116,11 @@ oh-my-dsh bundle 内部包含 4 个小插件（小颗粒、可独立禁用）：
 
 后续轮注入（精简）：
 ```
-[L1] 不确定就说不确定。[L2] 假设先行。[I-08] 不加步骤能完成 = 拒绝。
+[L1] 不确定就说不确定。
+[L2] 假设先行。
+[I-08] 不加步骤能完成 = 拒绝。
 ```
+（每个层标记独占一行：层过滤按行生效，单行会被整体跳过——v0.1 review Y2）
 
 **DSH 挂钩点**：`agent/pre-step` 瀑布事件——改写 `payload.messages`，在用户消息后追加认知导航（作为新的 UserMessage 或拼接到最后一条消息末尾）。
 
@@ -139,14 +142,14 @@ oh-my-dsh bundle 内部包含 4 个小插件（小颗粒、可独立禁用）：
 
 **DSH 挂钩点**（已从 dsh v0.1.0-rc.5 源码验证）：
 - `agent/pre-step`：提取硬约束（写入插件内部状态）
-- `agent/pre-step`：生成前预防——检查历史消息是否违反约束，违反则在 messages 末尾追加约束提醒
+- `agent/pre-step`：生成前预防——只检查"约束首次出现之后、上一轮检查之后"的新 assistant 消息（不拼全部历史，避免用户约束原文自我触发），命中否定型约束关键词则在 messages 末尾追加约束提醒；肯定型（"必须…"）约束只记录不判定
 
 **注意**：官方 dsh 的 tools 事件是 `tools/*` 管道（非独立的 pre-execute/post-execute 钩子），v0.1 通过 agent/pre-step 在模型生成前注入约束提醒实现"预防"，而非执行时"拦截"。拦截需要 tools/* 事件的深入适配，列入 v0.2。
 
 **验收标准**：
-- AC-1：用户说"不要修改 API 契约"→ 提取硬约束（对应测试：extractor.test.ts #1）
-- AC-2：后续 agent/pre-step 检测到涉及 API 修改 → 在 messages 末尾追加约束提醒（对应测试：extractor.test.ts #6 + integration test）
-- AC-3：可通过 Config 添加自定义约束关键词（对应测试：extractor.test.ts #5）
+- AC-1：用户说"不要修改 API 契约"→ 提取硬约束（对应测试：extractor.test.ts「提取"不要"约束（否定型）」）
+- AC-2：后续 agent/pre-step 检测到 assistant 新输出涉及 API 修改 → 在 messages 末尾追加约束提醒（对应测试：integration/constraint-immune.test.ts「模型输出违反否定型约束时追加提醒」）
+- AC-3：可通过 Config 添加自定义约束关键词（对应测试：extractor.test.ts「自定义关键词提取（customPatterns，PRD AC-3）」）
 
 ### 3.5 P2：model-router 插件（v0.1 不实现，仅规划）
 

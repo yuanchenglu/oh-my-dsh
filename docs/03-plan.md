@@ -320,18 +320,18 @@ describe('classifyIntent', () => {
 
 ### 任务 M1-4：插件入口（index.ts）
 
-**输入**：M1-1 + M1-2 + 架构文档中的 llm/stream 挂钩示例
+**输入**：M1-1 + M1-2 + 架构文档中的 agent/request 挂钩示例
 **输出**：`src/intent-router/index.ts`
 
 **执行**：创建文件，实现：
 1. `export const name = 'intent-router'`
-2. `export const inject = ['llm']`
+2. 不声明 inject（实测 inject: ['llm'] 导致加载顺序死锁；事件监听先于服务注册挂上即可触发）
 3. `Config` interface + Schema（effortMap 可配置，默认值见 PRD 3.2 节映射表）
-4. `apply(ctx, config)`：注册 `llm/stream` 事件监听
-   - 提取最后一条用户消息（用架构文档中的 `extractLastUserMessage` 函数）
+4. `apply(ctx, config)`：注册 `agent/request` 事件监听
+   - `await next()` 拿到下游调用配置
+   - 从 `payload.agent.session.deriveMessages()` 提取最后一条用户消息（用架构文档中的 `extractLastUserMessage` 函数）
    - 调用 `classifyIntent` 分类
-   - 按 `config.effortMap` 设置 `options.reasoningEffort`
-   - `return next()`
+   - 按 `config.effortMap` 返回 `{ ...callConfig, reasoningEffort: effort }`
 
 **验收**：`pnpm run typecheck` 通过 + `tests/integration/intent-router.test.ts` 通过
 
@@ -456,18 +456,18 @@ export function checkAgainstConstraints(
 # oh-my-dsh bundle patch：一次 insert 全部插件
 - insert:
     - id: intent-router
-      name: oh-my-dsh/src/intent-router/index.js
+      name: oh-my-dsh/lib/src/intent-router/index.js
       config:
         enabled: true
 
     - id: cognition-gate
-      name: oh-my-dsh/src/cognition-gate/index.js
+      name: oh-my-dsh/lib/src/cognition-gate/index.js
       config:
         layers: { l1: true, l2: true, i02: true, i08: true }
         excludePatterns: []
 
     - id: constraint-immune
-      name: oh-my-dsh/src/constraint-immune/index.js
+      name: oh-my-dsh/lib/src/constraint-immune/index.js
       config:
         enabled: true
         customPatterns: []
@@ -500,7 +500,7 @@ export function checkAgainstConstraints(
 
 **输入文件**：
 - 本文档 M1 节（任务 M1-1 到 M1-4）
-- 架构文档 2.2 节（llm/stream 挂钩示例）
+- 架构文档 2.2 节（agent/request 挂钩示例）
 - 架构文档 3.1 节（分类算法伪代码）
 
 **输出文件**：
