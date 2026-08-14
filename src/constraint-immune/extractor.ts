@@ -25,6 +25,32 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** 仅为有明确语义对应关系的工具动作提供英文别名。 */
+const TOOL_OPERATION_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  删除: ['rm', 'delete', 'remove', 'unlink', 'rmdir'],
+})
+
+function includesToolAlias(text: string, alias: string): boolean {
+  // 工具名可能是 delete_file，命令参数也可能是 rm -f；按字母边界匹配两者。
+  return new RegExp(`(?:^|[^A-Za-z])${escapeRegExp(alias)}(?:$|[^A-Za-z])`, 'i').test(text)
+}
+
+/**
+ * 检查工具调用文本是否命中否定型约束。
+ * 除字面命中外，仅对显式动作词映射 + 原始对象文本同时出现的情况判定。
+ */
+export function matchesToolConstraint(text: string, constraint: Constraint): boolean {
+  if (constraint.kind !== 'negative' || !constraint.keyword) return false
+  if (text.includes(constraint.keyword)) return true
+
+  for (const [operation, aliases] of Object.entries(TOOL_OPERATION_ALIASES)) {
+    if (!constraint.keyword.startsWith(operation)) continue
+    const operand = constraint.keyword.slice(operation.length).trim()
+    if (operand && text.includes(operand) && aliases.some((alias) => includesToolAlias(text, alias))) return true
+  }
+  return false
+}
+
 function collect(
   message: string,
   re: RegExp,

@@ -184,6 +184,25 @@ describe('constraint-immune plugin', () => {
     expect(results[0].reason).toContain('禁止删除生产数据')
   })
 
+  it('缺陷回归：中文删除约束拦截 bash 的英文 rm 命令', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, { enabled: true, customPatterns: [], interception: 'deny' })
+    const agent = { id: 's1' }
+    await ctx._preStep({
+      agent,
+      messages: [{ role: 'user', content: '禁止删除 /tmp/constraint-test.txt' }],
+      turn: 0,
+    })
+    const { next, results } = await ctx._preExecute({
+      name: 'bash',
+      arguments: { command: 'rm -f /tmp/constraint-test.txt' },
+      agent,
+    })
+    expect(next).not.toHaveBeenCalled()
+    expect(results[0].kind).toBe('deny')
+    expect(results[0].reason).toContain('禁止删除 /tmp/constraint-test.txt')
+  })
+
   it('AC-2：不命中约束的工具调用放行', async () => {
     const ctx = createMockCtx()
     apply(ctx as any, { enabled: true, customPatterns: [], interception: 'deny' })

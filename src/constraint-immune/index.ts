@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
-import { extractHardConstraints, checkAgainstConstraints, type Constraint } from './extractor.js'
+import { extractHardConstraints, checkAgainstConstraints, matchesToolConstraint, type Constraint } from './extractor.js'
 import { contentToText } from '../shared/messages.js'
 
 export const name = 'constraint-immune'
@@ -125,7 +125,7 @@ export function apply(ctx: Context, config: Config) {
       for (const stored of session.constraints.values()) {
         if (stored.kind !== 'negative') continue
         if (stored.keyword.length < 4) continue
-        if (text.includes(stored.keyword)) {
+        if (matchesToolConstraint(text, stored)) {
           return Promise.resolve({
             kind: 'deny' as const,
             reason: `[constraint-immune] 命中硬约束："${stored.raw}"`,
