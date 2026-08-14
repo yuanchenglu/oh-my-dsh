@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { apply } from '../../src/cognition-gate/index.js'
 import type { InjectionConfig } from '../../src/cognition-gate/injector.js'
 
-/** 简化 mock：仅包含测试需要的 on/effect */
+/** 简化 mock：捕获 agent/pre-step listener 并手动触发 */
 function createMockCtx() {
   const listeners: Record<string, Function[]> = {}
   return {
@@ -13,12 +13,14 @@ function createMockCtx() {
     effect: vi.fn(),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     _listeners: listeners,
-    /** 模拟触发 waterfall 事件 */
-    _emitWaterfall: async (event: string, payload: Record<string, unknown>) => {
-      const fns = listeners[event] || []
-      const next = vi.fn().mockResolvedValue({ kind: 'enter', messages: payload.messages ?? [] })
-      for (const fn of fns) await fn(payload, next)
-      return next
+    _preStep: async (payload: { messages: unknown[]; turn: number; aborted?: boolean }) => {
+      const controller = new AbortController()
+      if (payload.aborted) controller.abort()
+      const full = { messages: payload.messages, turn: payload.turn, step: 0, signal: controller.signal }
+      const next = vi.fn().mockResolvedValue({ kind: 'enter', messages: payload.messages })
+      const results = []
+      for (const fn of listeners['agent/pre-step'] || []) results.push(await fn(full, next))
+      return { next, results }
     },
   }
 }
@@ -38,40 +40,55 @@ describe('cognition-gate plugin', () => {
   it('injects full cognition on turn 0', async () => {
     const ctx = createMockCtx()
     apply(ctx as never, defaultConfig)
-    const payload = {
+    const { next, results } = await ctx._preStep({
       messages: [{ role: 'user', content: '帮我写代码' }],
       turn: 0,
-      step: 0,
-      signal: new AbortController().signal,
-    }
-    const next = await ctx._emitWaterfall('agent/pre-step', payload)
+    })
     expect(next).not.toHaveBeenCalled()
-  })
-
-  it('calls next when signal is aborted', async () => {
-    const ctx = createMockCtx()
-    apply(ctx as never, defaultConfig)
-    const controller = new AbortController()
-    controller.abort()
-    const payload = {
-      messages: [{ role: 'user', content: '帮我写代码' }],
-      turn: 0,
-      step: 0,
-      signal: controller.signal,
-    }
-    const next = await ctx._emitWaterfall('agent/pre-step', payload)
-    expect(next).toHaveBeenCalled()
+    const messages = results[0].messages as Array<{ role: string; content: string }>
+    expect(messages).toHaveLength(1)
+    expect(messages[0].content).toContain('帮我写代码')
+    expect(messages[0].content).toContain('[L1 荣辱观]')
+    expect(messages[0].content).toContain('[L2 思维方式]')
+    expect(messages[0].content).toContain('[I-02 双向原语]')
+    expect(messages[0].content).toContain('[I-08 范围控制]')
   })
 
   it('injects brief cognition on turn 1', async () => {
     const ctx = createMockCtx()
     apply(ctx as never, defaultConfig)
-    const payload = {
+    const { results } = await ctx._preStep({
       messages: [{ role: 'user', content: '继续' }],
       turn: 1,
-      step: 0,
-      signal: new AbortController().signal,
-    }
-    await ctx._emitWaterfall('agent/pre-step', payload)
+    })
+    const messages = results[0].messages as Array<{ role: string; content: string }>
+    expect(messages[0].content).toContain('[L1]')
+    expect(messages[0].content).toContain('[L2]')
+    expect(messages[0].content).toContain('[I-08]')
+    expect(messages[0].content).not.toContain('[I-02 双向原语]')
+  })
+
+  it('单层关闭时其余层仍注入（turn=1，Y2 回归）', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as never, { ...defaultConfig, layers: { l1: true, l2: false, i02: true, i08: true } })
+    const { results } = await ctx._preStep({
+      messages: [{ role: 'user', content: '继续' }],
+      turn: 1,
+    })
+    const messages = results[0].messages as Array<{ role: string; content: string }>
+    expect(messages[0].content).toContain('[L1]')
+    expect(messages[0].content).not.toContain('[L2]')
+    expect(messages[0].content).toContain('[I-08]')
+  })
+
+  it('calls next when signal is aborted', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as never, defaultConfig)
+    const { next } = await ctx._preStep({
+      messages: [{ role: 'user', content: '帮我写代码' }],
+      turn: 0,
+      aborted: true,
+    })
+    expect(next).toHaveBeenCalled()
   })
 })
