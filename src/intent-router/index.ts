@@ -4,7 +4,7 @@ import { classifyIntent } from './classifier.js'
 import { strategies } from './strategies.js'
 
 export const name = 'intent-router'
-export const inject = ['llm']
+// inject llm 会导致加载顺序问题，v0.1 先不声明依赖
 
 export interface Config {
   enabled: boolean
