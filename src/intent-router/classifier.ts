@@ -39,7 +39,8 @@ export function keywordMatchScore(keyword: string, text: string): number {
  * 意图分类（从 intent_router.py 移植）
  *
  * 对每个意图的关键词累计得分（≥0.5 的匹配计入），
- * 置信度 = best / (best + second)，< 0.5 回退 spec_driven。
+ * 置信度 = best / (best + second)（数学上恒 ≥ 0.5，仅作观测值），
+ * 无任何关键词命中时回退 spec_driven。
  */
 export function classifyIntent(taskDescription: string, strategies: Strategies): Classification {
   const scores: Record<string, number> = {}
@@ -64,8 +65,5 @@ export function classifyIntent(taskDescription: string, strategies: Strategies):
   const second = entries[1] ?? ['', 0]
   const confidence = best[1] / (best[1] + second[1])
 
-  if (confidence < 0.5) {
-    return { intent: 'spec_driven', confidence }
-  }
   return { intent: best[0] as Classification['intent'], confidence }
 }
