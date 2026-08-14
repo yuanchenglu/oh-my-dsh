@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { classifyIntent } from './classifier.js'
 import { strategies } from './strategies.js'
+import { extractLastUserMessage } from '../shared/messages.js'
 
 export const name = 'intent-router'
 // 不声明 inject：agent/request 是事件挂钩，事件监听器在 agent 服务注册前挂上即可触发（v0.1 实测 inject 会导致加载顺序死锁）
@@ -41,26 +42,6 @@ interface RequestPayload {
   turn: number
   step: number
   signal: AbortSignal
-}
-
-/** 把消息 content 拍平为纯文本（string 直取，ContentBlock[] 拼接 text part） */
-function contentToText(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (part && typeof part === 'object' && 'text' in part ? String((part as { text: unknown }).text) : ''))
-      .join('')
-  }
-  return ''
-}
-
-/** 从消息数组提取最后一条用户消息的纯文本 */
-function extractLastUserMessage(messages: readonly { role?: string; content?: unknown }[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (msg.role === 'user') return contentToText(msg.content)
-  }
-  return ''
 }
 
 export function apply(ctx: Context, config: Config) {

@@ -5,6 +5,17 @@
       config:
         enabled: true
 
+    - id: model-router
+      name: oh-my-dsh/lib/src/model-router/index.js
+      config:
+        enabled: true
+        defaultModel: deepseek-v4-flash
+        proModel: deepseek-v4-pro
+        upgradeIntents: [architecture, research]
+        tokenThreshold: 30000
+        dissatisfactionEnabled: true
+        dissatisfactionPatterns: []
+
     - id: cognition-gate
       name: oh-my-dsh/lib/src/cognition-gate/index.js
       config:
@@ -16,3 +27,4 @@
       config:
         enabled: true
         customPatterns: []
+        interception: deny

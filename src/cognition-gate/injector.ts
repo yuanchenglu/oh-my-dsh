@@ -1,3 +1,5 @@
+import { contentToText } from '../shared/messages.js'
+
 /** 首轮完整注入文本 */
 export const FULL_INJECTION = `[L1 荣辱观] 以知道自己的不足为荣、以提升认知为荣、以告诉实情为荣。不确定就说不确定。
 [L2 思维方式] 第一性原理、Step by Step、假设先行、找盲区、科研严谨。
@@ -43,17 +45,6 @@ export function buildInjection(turn: number, config: InjectionConfig): string {
 /** 检查消息是否匹配排除模式 */
 function matchesExcludePattern(content: string, patterns: string[]): boolean {
   return patterns.some((pattern) => content.includes(pattern))
-}
-
-/** content 拍平为纯文本（仅用于排除模式匹配） */
-function contentToText(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (part && typeof part === 'object' && 'text' in part ? String((part as { text: unknown }).text) : ''))
-      .join('')
-  }
-  return ''
 }
 
 /** 认知注入：在最后一条用户消息末尾追加注入文本，返回新数组 */

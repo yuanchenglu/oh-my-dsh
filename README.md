@@ -15,8 +15,9 @@ dsh plugin add oh-my-dsh
 | 插件 | 功能 | 挂钩点 |
 |------|------|--------|
 | **intent-router** | 意图分类 → 自动设置 reasoningEffort | `agent/request` |
+| **model-router** | Flash-first，复杂任务自动升级 Pro | `agent/request` |
 | **cognition-gate** | 每轮注入认知导航（L1/L2/L3） | `agent/pre-step` |
-| **constraint-immune** | 提取并强制执行用户硬约束 | `agent/pre-step` |
+| **constraint-immune** | 提取、提醒并拦截用户硬约束 | `agent/pre-step` + `tools/pre-execute` |
 
 ## 配置
 
@@ -27,6 +28,11 @@ dsh plugin add oh-my-dsh
 - id: cognition-gate
   disabled: true
 
+# 关闭 constraint-immune 的工具拦截，仅保留提醒
+- id: constraint-immune
+  config:
+    interception: off
+
 # 自定义意图映射
 - id: intent-router
   config:
@@ -34,6 +40,11 @@ dsh plugin add oh-my-dsh
       architecture: max
       refactor: high
 ```
+
+## v0.2 Release Notes
+
+- `constraint-immune` 默认行为从仅提醒变为提醒 + 工具执行拦截（`interception: deny`）；如需保持 v0.1 行为，配置 `interception: off`。
+- `model-router` 默认优先使用 `deepseek-v4-flash`，架构、研究、超长上下文或连续不满意时升级到 Pro。
 
 ## 开发
 

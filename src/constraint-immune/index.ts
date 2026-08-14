@@ -1,17 +1,20 @@
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { extractHardConstraints, checkAgainstConstraints, type Constraint } from './extractor.js'
+import { contentToText } from '../shared/messages.js'
 
 export const name = 'constraint-immune'
 
 export interface Config {
   enabled: boolean
   customPatterns: string[]
+  interception?: 'off' | 'deny'
 }
 
 export const Config: Schema<Config> = Schema.object({
   enabled: Schema.boolean().default(true),
   customPatterns: Schema.array(Schema.string()).default([]),
+  interception: Schema.string().default('deny'),
 })
 
 /** 简化版 PreStepDecision（与 dsh 对齐） */
@@ -27,19 +30,8 @@ interface PreStepPayload {
   signal: AbortSignal
 }
 
-/** 约束 + 首次出现的消息下标（messages 只增不改，下标稳定；session 压缩时退化为近似值） */
-type StoredConstraint = Constraint & { messageIndex: number }
-
-/** 把消息 content 拍平为纯文本（string 直取，ContentBlock[] 拼接 text part） */
-function contentToText(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (part && typeof part === 'object' && 'text' in part ? String((part as { text: unknown }).text) : ''))
-      .join('')
-  }
-  return ''
-}
+/** 约束 + 首次出现的消息下标 + 肯定型一次性检查标记 */
+type StoredConstraint = Constraint & { messageIndex: number; positiveChecked?: boolean }
 
 export function apply(ctx: Context, config: Config) {
   if (!config.enabled) return
@@ -90,7 +82,57 @@ export function apply(ctx: Context, config: Config) {
       }
     }
 
+    // 3. 肯定型约束“缺少执行”一次性检查：只看首次出现后的第一段新 assistant 输出。
+    for (const stored of constraints.values()) {
+      if (stored.kind !== 'positive' || stored.positiveChecked) continue
+      const scope = messages
+        .slice(Math.max(stored.messageIndex + 1, session.checkedUpTo))
+        .filter((m) => m.role === 'assistant')
+        .map((m) => contentToText(m.content))
+        .join('\n')
+      if (!scope.trim()) continue
+      stored.positiveChecked = true
+      if (!scope.includes(stored.keyword)) {
+        session.checkedUpTo = messages.length
+        const reminder = {
+          role: 'user' as const,
+          content: `[约束提醒] 检测到可能未执行硬约束："${stored.raw}"。请确认已执行。`,
+        }
+        return { kind: 'enter', messages: [...messages, reminder] }
+      }
+    }
+
     session.checkedUpTo = messages.length
     return next()
   })
+
+  // 执行时拦截：工具派发前检查工具名与参数是否命中否定型约束关键词。
+  if (config.interception === 'deny') {
+    ctx.on('tools/pre-execute', (exec: {
+      name: string
+      arguments: unknown
+      agent?: { id?: unknown }
+    }, next: () => Promise<{ kind: 'allow' } | { kind: 'deny'; reason: string } | { kind: 'ask'; reason?: string }>) => {
+      const sessionId = exec.agent?.id != null ? String(exec.agent.id) : 'default'
+      const session = sessions.get(sessionId)
+      if (!session || session.constraints.size === 0) return next()
+
+      const argsText = typeof exec.arguments === 'string'
+        ? exec.arguments
+        : JSON.stringify(exec.arguments ?? '')
+      const text = exec.name + '\n' + argsText
+
+      for (const stored of session.constraints.values()) {
+        if (stored.kind !== 'negative') continue
+        if (stored.keyword.length < 4) continue
+        if (text.includes(stored.keyword)) {
+          return Promise.resolve({
+            kind: 'deny' as const,
+            reason: `[constraint-immune] 命中硬约束："${stored.raw}"`,
+          })
+        }
+      }
+      return next()
+    })
+  }
 }
