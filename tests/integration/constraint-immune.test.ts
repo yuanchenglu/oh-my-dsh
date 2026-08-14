@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { apply } from '../../src/constraint-immune/index.js'
 
-/** 简化 mock：仅包含测试需要的 on/effect */
+/** 简化 mock：捕获 agent/pre-step listener 并手动触发 */
 function createMockCtx() {
   const listeners: Record<string, Function[]> = {}
   return {
@@ -12,15 +12,21 @@ function createMockCtx() {
     effect: vi.fn(),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     _listeners: listeners,
-    _emitWaterfall: async (event: string, payload: any) => {
-      const fns = listeners[event] || []
-      const next = vi.fn().mockResolvedValue({ kind: 'enter', messages: payload.messages ?? [] })
+    _preStep: async (payload: {
+      agent?: { id?: string }
+      messages: Array<{ role: string; content: unknown }>
+      turn: number
+    }) => {
+      const full = { step: 0, signal: new AbortController().signal, ...payload }
+      const next = vi.fn().mockResolvedValue({ kind: 'enter', messages: full.messages })
       const results = []
-      for (const fn of fns) results.push(await fn(payload, next))
+      for (const fn of listeners['agent/pre-step'] || []) results.push(await fn(full, next))
       return { next, results }
     },
   }
 }
+
+const USER_CONSTRAINT = '不要修改 API 契约'
 
 describe('constraint-immune plugin', () => {
   it('registers agent/pre-step listener', () => {
@@ -29,22 +35,130 @@ describe('constraint-immune plugin', () => {
     expect(ctx.on).toHaveBeenCalledWith('agent/pre-step', expect.any(Function))
   })
 
-  it('extracts constraints from user messages', async () => {
-    const ctx = createMockCtx()
-    apply(ctx as any, { enabled: true, customPatterns: [] })
-    const payload = {
-      messages: [{ role: 'user', content: '不要修改 API 契约' }],
-      turn: 0,
-      step: 0,
-      signal: new AbortController().signal,
-    }
-    const { next } = await ctx._emitWaterfall('agent/pre-step', payload)
-    expect(next).toHaveBeenCalled()
-  })
-
   it('does not register when disabled', () => {
     const ctx = createMockCtx()
     apply(ctx as any, { enabled: false, customPatterns: [] })
     expect(ctx.on).not.toHaveBeenCalled()
+  })
+
+  it('turn=0 只提取不检查', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, { enabled: true, customPatterns: [] })
+    const { next, results } = await ctx._preStep({
+      messages: [{ role: 'user', content: USER_CONSTRAINT }],
+      turn: 0,
+    })
+    expect(next).toHaveBeenCalled()
+    expect(results[0]).toEqual({ kind: 'enter', messages: [{ role: 'user', content: USER_CONSTRAINT }] })
+  })
+
+  it('R3：turn>0 时历史里用户自己的约束原文不触发误报', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, { enabled: true, customPatterns: [] })
+    const agent = { id: 's1' }
+    await ctx._preStep({ agent, messages: [{ role: 'user', content: USER_CONSTRAINT }], turn: 0 })
+    const { next, results } = await ctx._preStep({
+      agent,
+      messages: [
+        { role: 'user', content: USER_CONSTRAINT },
+        { role: 'assistant', content: '好的，我会遵守约束，保持契约不变。' },
+      ],
+      turn: 1,
+    })
+    expect(next).toHaveBeenCalled()
+    expect(results[0].messages).toHaveLength(2)
+  })
+
+  it('模型输出违反否定型约束时追加提醒', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, { enabled: true, customPatterns: [] })
+    const agent = { id: 's1' }
+    await ctx._preStep({ agent, messages: [{ role: 'user', content: USER_CONSTRAINT }], turn: 0 })
+    const { results } = await ctx._preStep({
+      agent,
+      messages: [
+        { role: 'user', content: USER_CONSTRAINT },
+        { role: 'assistant', content: '我现在修改 API 契约如下……' },
+      ],
+      turn: 1,
+    })
+    const messages = results[0].messages as Array<{ role: string; content: string }>
+    expect(messages).toHaveLength(3)
+    expect(messages[2].content).toContain('[约束提醒]')
+    expect(messages[2].content).toContain(USER_CONSTRAINT)
+  })
+
+  it('约束首次出现之前的 assistant 消息不参与判定', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, { enabled: true, customPatterns: [] })
+    const agent = { id: 's1' }
+    // assistant 在约束出现之前提到"修改 API 契约"，之后没有再提
+    const messages = [
+      { role: 'assistant', content: '我建议修改 API 契约来简化。' },
+      { role: 'user', content: USER_CONSTRAINT },
+    ]
+    await ctx._preStep({ agent, messages, turn: 0 })
+    const { next, results } = await ctx._preStep({ agent, messages, turn: 1 })
+    expect(next).toHaveBeenCalled()
+    expect(results[0].messages).toHaveLength(2)
+  })
+
+  it('提醒文本不会被再次提取为约束（不自我复制）', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, { enabled: true, customPatterns: [] })
+    const agent = { id: 's1' }
+    await ctx._preStep({ agent, messages: [{ role: 'user', content: USER_CONSTRAINT }], turn: 0 })
+    const first = await ctx._preStep({
+      agent,
+      messages: [
+        { role: 'user', content: USER_CONSTRAINT },
+        { role: 'assistant', content: '我现在修改 API 契约如下……' },
+      ],
+      turn: 1,
+    })
+    const withReminder = first.results[0].messages as Array<{ role: string; content: string }>
+    // 下一轮带着提醒文本 + 合规的 assistant 回复：不应再追加提醒
+    const second = await ctx._preStep({
+      agent,
+      messages: [...withReminder, { role: 'assistant', content: '明白，我不会改动契约。' }],
+      turn: 2,
+    })
+    expect(second.next).toHaveBeenCalled()
+    expect(second.results[0].messages).toHaveLength(4)
+  })
+
+  it('Y5：不同 agent.id 的会话约束互相隔离', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, { enabled: true, customPatterns: [] })
+    await ctx._preStep({ agent: { id: 's1' }, messages: [{ role: 'user', content: USER_CONSTRAINT }], turn: 0 })
+    // s2 没有约束，即使 assistant 提到关键词也不追加提醒
+    const { next, results } = await ctx._preStep({
+      agent: { id: 's2' },
+      messages: [
+        { role: 'user', content: '继续' },
+        { role: 'assistant', content: '我现在修改 API 契约如下……' },
+      ],
+      turn: 1,
+    })
+    expect(next).toHaveBeenCalled()
+    expect(results[0].messages).toHaveLength(2)
+  })
+
+  it('R2：customPatterns 自定义前缀参与提取与判定', async () => {
+    const ctx = createMockCtx()
+    apply(ctx as any, { enabled: true, customPatterns: ['务必'] })
+    const agent = { id: 's1' }
+    await ctx._preStep({ agent, messages: [{ role: 'user', content: '务必使用 pnpm 安装依赖' }], turn: 0 })
+    const { results } = await ctx._preStep({
+      agent,
+      messages: [
+        { role: 'user', content: '务必使用 pnpm 安装依赖' },
+        { role: 'assistant', content: '我现在使用 pnpm 安装依赖。' },
+      ],
+      turn: 1,
+    })
+    const messages = results[0].messages as Array<{ role: string; content: string }>
+    expect(messages).toHaveLength(3)
+    expect(messages[2].content).toContain('[约束提醒]')
   })
 })
