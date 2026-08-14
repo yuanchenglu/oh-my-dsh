@@ -14,12 +14,12 @@ export const strategies: Strategies = {
   },
   medium: {
     description: '在现有项目中添加或修改中等规模功能',
-    keywords: ['添加', '修改', '更新', '增加', 'add', 'modify', '功能', '扩展', 'endpoint'],
+    keywords: ['添加', '修改', '更新', '增加', 'add', 'modify', '扩展', 'endpoint'],
     common_creep: [],
   },
   collaboration: {
     description: '多 Agent 或人机协作',
-    keywords: ['协作', '多人', '分派', '并行', 'collaborate', 'parallel', 'team', '分工', '完成'],
+    keywords: ['协作', '多人', '分派', '并行', 'collaborate', 'parallel', 'team', '分工'],
     common_creep: ['不急的优化', '不要额外协调轮次'],
   },
   architecture: {
