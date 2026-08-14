@@ -1,18 +1,18 @@
 # oh-my-dsh bundle patch：一次 insert 全部插件
 - insert:
     - id: intent-router
-      name: oh-my-dsh/src/intent-router/index.js
+      name: oh-my-dsh/lib/src/intent-router/index.js
       config:
         enabled: true
 
     - id: cognition-gate
-      name: oh-my-dsh/src/cognition-gate/index.js
+      name: oh-my-dsh/lib/src/cognition-gate/index.js
       config:
         layers: { l1: true, l2: true, i02: true, i08: true }
         excludePatterns: []
 
     - id: constraint-immune
-      name: oh-my-dsh/src/constraint-immune/index.js
+      name: oh-my-dsh/lib/src/constraint-immune/index.js
       config:
         enabled: true
         customPatterns: []
