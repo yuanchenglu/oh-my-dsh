@@ -1,4 +1,5 @@
 # oh-my-dsh bundle patch：一次 insert 全部插件
+# 顺序是冻结的事件链：checkpoint-trace 必须包住后续裁决插件，捕获 deny/ask 结局。
 - insert:
     - id: intent-router
       name: oh-my-dsh/lib/src/intent-router/index.js
@@ -22,9 +23,30 @@
         layers: { l1: true, l2: true, i02: true, i08: true }
         excludePatterns: []
 
+    # 必须在 constraint/scope/review 之前，以 wrap next() 捕获 deny/ask。
+    - id: checkpoint-trace
+      name: oh-my-dsh/lib/src/checkpoint-trace/index.js
+      config:
+        enabled: true
+        allowedPaths: []
+        contractRevision: 1
+
     - id: constraint-immune
       name: oh-my-dsh/lib/src/constraint-immune/index.js
       config:
         enabled: true
         customPatterns: []
         interception: deny
+
+    - id: scope-guard
+      name: oh-my-dsh/lib/src/scope-guard/index.js
+      config:
+        enabled: true
+        autoExtract: true
+
+    - id: review-router
+      name: oh-my-dsh/lib/src/review-router/index.js
+      config:
+        enabled: true
+        allowedPaths: []
+        policyVersion: oh-my-dsh-v0.3

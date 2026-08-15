@@ -32,12 +32,18 @@ describe('E2E: bundle structure', () => {
     const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf-8'))
     expect(pkg.name).toBe('oh-my-dsh')
     expect(pkg.type).toBe('module')
+    expect(pkg.version).toBe('0.3.0')
+    expect(pkg.peerDependencies['@deepseek-ai/cordis']).toBe('0.1.0-rc.*')
   })
 
   it('patch entries point at lib/src/** and each maps to an existing src/** entry', () => {
     const patch = readFileSync(resolve(ROOT, 'cordis.patch.yml'), 'utf-8')
     const names = [...patch.matchAll(/name:\s*oh-my-dsh\/(lib\/src\/(\S+)\/index\.js)/g)]
-    expect(names.length).toBeGreaterThanOrEqual(3)
+    expect(names.length).toBe(7)
+    expect(names.map(([, , pluginDir]) => pluginDir)).toEqual([
+      'intent-router', 'model-router', 'cognition-gate', 'checkpoint-trace',
+      'constraint-immune', 'scope-guard', 'review-router',
+    ])
     const tsconfig = JSON.parse(readFileSync(resolve(ROOT, 'tsconfig.json'), 'utf-8'))
     expect(tsconfig.compilerOptions.outDir).toBe('lib')
     for (const [, libPath, pluginDir] of names) {
