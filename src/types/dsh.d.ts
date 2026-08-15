@@ -11,7 +11,31 @@ declare module '@deepseek-ai/cordis' {
       warn(...args: unknown[]): void
       error(...args: unknown[]): void
     }
+    llm: {
+      resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<{
+        reasoning?: { efforts: readonly { id: string }[]; defaultEffort?: string }
+      }>
+    }
     [key: string]: unknown
+  }
+}
+
+declare module '@deepseek-ai/dsh-session' {
+  export interface SessionHeader {
+    id: string
+    cwd?: string
+    parentSession?: string
+  }
+
+  export interface Session {
+    readonly header: SessionHeader
+  }
+}
+
+declare module '@deepseek-ai/dsh-llm' {
+  export interface LlmModelReasoningInfo {
+    efforts: readonly { id: string }[]
+    defaultEffort?: string
   }
 }
 
