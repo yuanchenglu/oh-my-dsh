@@ -1,7 +1,7 @@
 # oh-my-dsh v0.3 测试体系文档
 
 > 基线：v0.2 的 111 个测试；v0.3 当前总计 151 个 A1 桩/单元测试。
-> A0 真实 dsh smoke 已提供，但本机 dsh 不在 PATH 且 DEEPSEEK_API_KEY 缺失，真实运行状态是 blocked。
+> A0 真实 dsh smoke 已提供；源码版 dsh 已通过安装、配置解析和 headless 帮助挂载预检，但 DEEPSEEK_API_KEY 缺失，完整真实运行状态仍是 blocked。
 
 ## TL;DR
 
@@ -157,12 +157,15 @@ allow-once 不是发布门禁。测试 profile 可以注册 test-only approval a
 本工作区实际检查结果：
 
 ~~~text
-dsh executable: absent
+dsh source checkout: /Users/bluth/Code/deepseek-src/deepseek-harness @ 47f943859b
+real dsh plugin add: exit 0
+real dsh --dump-config: exit 0; seven oh-my-dsh rows in frozen order
+real dsh --profile headless --help: exit 0
 DEEPSEEK_API_KEY: absent
 real-dsh.smoke.js: exit 77, A0 BLOCKED
 ~~~
 
-因此安装、headless、fork、resume 没有被声称为通过。静态 package tarball 已验证 7 个 lib/src 插件入口。
+因此模型驱动的 headless 会话、工具决策、fork、resume 没有被声称为通过；headless 帮助挂载仅作为真实 dsh 预检。静态 package tarball 已验证 7 个 lib/src 插件入口。
 
 ## 6. 覆盖目标与回归
 

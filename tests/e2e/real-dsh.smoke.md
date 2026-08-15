@@ -18,4 +18,4 @@ DEEPSEEK_API_KEY="$DEEPSEEK_API_KEY" DSH_BIN=/path/to/dsh \
 - 在 checkpoint 边界 fork，子 session 通过 parentSession 找到最近 checkpoint；
 - kill 后重启 dsh，resume 同一 session 成功。
 
-本工作区当前证据：`dsh` 不在 PATH，`DEEPSEEK_API_KEY` 未设置，脚本因此以退出码 77 标记 A0 blocked；没有伪造真实运行结果。
+本工作区当前证据：源码版 dsh 位于 `/Users/bluth/Code/deepseek-src/deepseek-harness` 但不在 PATH；其 tarball 安装、7 插件配置解析和 headless 帮助挂载已通过。`DEEPSEEK_API_KEY` 未设置，完整 smoke 以退出码 77 标记 A0 blocked；没有伪造模型会话结果。

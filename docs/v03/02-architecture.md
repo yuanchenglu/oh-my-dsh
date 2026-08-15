@@ -1,7 +1,7 @@
 # oh-my-dsh v0.3 技术架构文档
 
 > 版本：0.3.0；dsh 源码基线：commit 47f943859（0.1.0-rc.5）。
-> 本文只把源码和测试已经证明的能力写成“已做”；A0 真实 dsh 因本机缺少 dsh 与 API key，状态为 blocked。
+> 本文只把源码和测试已经证明的能力写成“已做”；源码版 dsh 已完成安装、配置解析与 headless 挂载，但 A0 模型会话因 API key 缺失仍为 blocked。
 
 ## TL;DR
 
@@ -171,7 +171,7 @@ src/checkpoint-trace/index.ts:50-121 在 requiresCheckpoint 工具前后成对�
 | 安全 | 约束工具 deny | ScopeContract + 共享 R0-R4 + M0/M1/M4 |
 | 证据 | 无插件事实账本 | sidecar JSONL、checkpoint hash 链、Verdict |
 | 上下文 | 静态认知注入 | 四区标签和 pressure，不做驱逐 |
-| 真实验收 | 静态 bundle | A0 手册与脚本；本机当前 blocked |
+| 真实验收 | 静态 bundle | dsh 安装、配置解析、headless 挂载通过；模型会话当前 blocked |
 
 ## 5. 风险与对策
 
@@ -208,10 +208,10 @@ src/checkpoint-trace/index.ts:50-121 在 requiresCheckpoint 工具前后成对�
 | I-17 | 半做 | requested/effective effort 对账 |
 | I-18 | 未做 | 不实现动态索引编译 |
 
-证据等级：当前代码与仓库内桩测试为 A1；真实 dsh A0 因 dsh 不在 PATH 且 API key 缺失而 blocked，证据文件见 .omo/evidence/task-10-oh-my-dsh-v03.md。
+证据等级：当前代码与仓库内桩测试为 A1；真实 dsh 已通过安装、配置解析和帮助挂载预检，完整 A0 因 API key 缺失而 blocked，证据文件见 .omo/evidence/task-10-oh-my-dsh-v03.md。
 
 ## 附录 B：变更记录
 
 2026-08-15：冻结 sidecar、风险三轴、scope 状态机和 checkpoint wrap 契约。
 
-2026-08-16：完成 v0.3 代码、151 个 A1 测试、发布工程；A0 真实环境待 dsh 二进制与 DEEPSEEK_API_KEY。
+2026-08-16：完成 v0.3 代码、151 个 A1 测试、发布工程；真实 dsh 预检通过，A0 模型会话待 DEEPSEEK_API_KEY。

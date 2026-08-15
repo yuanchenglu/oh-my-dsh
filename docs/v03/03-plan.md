@@ -194,7 +194,7 @@ tests/e2e/real-dsh.smoke.ts 会检查 key、dsh、7 插件配置和 headless 输
 
 ### 已知环境结果
 
-本仓库当前 dsh 不在 PATH，DEEPSEEK_API_KEY 未设置；因此 A0 blocked，静态 bundle 与 151 个 A1 测试已通过。
+本仓库当前源码版 dsh 位于 `/Users/bluth/Code/deepseek-src/deepseek-harness`，不在 PATH；已完成 tarball 安装、7 插件配置解析和 headless 帮助挂载。DEEPSEEK_API_KEY 未设置，因此完整 A0 会话仍 blocked；静态 bundle 与 151 个 A1 测试已通过。
 
 commit：feat(v03): seven-plugin bundle, real-dsh e2e, version 0.3.0 | 新能力：七插件合集、真实 dsh 端到端验证、版本 0.3.0
 

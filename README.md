@@ -154,7 +154,7 @@ oh-my-dsh 是**插件合集**，不是闭死的一整盒。每个插件都是独
 - 新增 scope-guard、checkpoint-trace、review-router 三个插件；checkpoint 事实只写 sidecar，不写 session.append。
 - intent-router 增加 capability 对账；model-router 按 message.id 去重并记录 strategy 事实。
 - cognition-gate 增加 stable/evidence/active/external 四区软预算与 pressure 事实；不做驱逐或精确计费。
-- headless 无 approval answerer 时，M4 ask 按 fail-closed 语义降级 deny；本工作区 A0 真实 dsh 因缺少 dsh 与 API key 暂为 blocked。
+- headless 无 approval answerer 时，M4 ask 按 fail-closed 语义降级 deny；源码版 dsh 已完成安装、配置解析与 headless 挂载，但本工作区因缺少 API key 暂未完成 A0 会话。
 
 ### 创新点状态与证据等级
 
