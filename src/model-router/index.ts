@@ -3,6 +3,9 @@ import Schema from '@deepseek-ai/schemastery'
 import { classifyIntent } from '../intent-router/classifier.js'
 import { strategies } from '../intent-router/strategies.js'
 import { extractLastUserMessage, estimateTokens } from '../shared/messages.js'
+import { appendFact } from '../shared/facts.js'
+import { DEFAULT_STRATEGIES, type StrategyDecision } from '../shared/strategy.js'
+import type { Session } from '@deepseek-ai/dsh-session'
 
 export const name = 'model-router'
 // 不声明 inject：与 intent-router 同理，事件监听器先于服务注册挂上即可触发
@@ -43,7 +46,8 @@ interface RequestPayload {
   agent: {
     id?: unknown
     session: {
-      deriveMessages(): Array<{ role?: string; content?: unknown }>
+      deriveMessages(): Array<{ id?: string; role?: string; content?: unknown }>
+      header?: { id: string; cwd?: string }
     }
   }
   turn: number
@@ -81,8 +85,8 @@ export function evaluateUpgrade(params: {
 export function apply(ctx: Context, config: Config) {
   if (!config.enabled) return
 
-  // 每 agent 连续不满意轮数：agentId → count
-  const dissatisfactionStreak = new Map<string, number>()
+  interface SessionState { seenMessageIds: Set<string>; streak: number }
+  const dissatisfactionState = new WeakMap<object, SessionState>()
 
   const customRes = config.dissatisfactionPatterns
     .filter((p) => p.length > 0)
@@ -95,14 +99,34 @@ export function apply(ctx: Context, config: Config) {
     const messages = payload.agent.session.deriveMessages()
     const lastUser = extractLastUserMessage(messages)
 
-    // C3：更新连续不满意计数（命中 +1，否则清零）
-    const agentId = payload.agent.id != null ? String(payload.agent.id) : 'default'
-    const prev = dissatisfactionStreak.get(agentId) ?? 0
     const dissatisfied =
       lastUser.length > 0 &&
       (BUILTIN_DISSATISFACTION_RE.test(lastUser) || customRes.some((re) => re.test(lastUser)))
-    const streak = dissatisfied ? prev + 1 : 0
-    dissatisfactionStreak.set(agentId, streak)
+    const sessionObject = payload.agent.session as unknown as object
+    let state = dissatisfactionState.get(sessionObject)
+    if (payload.agent.session.header) {
+      state ??= { seenMessageIds: new Set(), streak: 0 }
+      dissatisfactionState.set(sessionObject, state)
+    }
+
+    const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')
+    let streak: number
+    if (state && lastUserMessage?.id) {
+      if (!state.seenMessageIds.has(lastUserMessage.id)) {
+        state.seenMessageIds.add(lastUserMessage.id)
+        state.streak = dissatisfied ? state.streak + 1 : 0
+      }
+      streak = state.streak
+    } else {
+      streak = 0
+      for (const message of [...messages].reverse()) {
+        if (message.role !== 'user') continue
+        const text = extractLastUserMessage([message])
+        const matches = text.length > 0 && (BUILTIN_DISSATISFACTION_RE.test(text) || customRes.some((re) => re.test(text)))
+        if (!matches) break
+        streak += 1
+      }
+    }
 
     const { intent } = lastUser
       ? classifyIntent(lastUser, strategies)
@@ -115,7 +139,27 @@ export function apply(ctx: Context, config: Config) {
       config,
     })
 
+    const model = decision.upgrade ? config.proModel : config.defaultModel
+    if (decision.upgrade && payload.agent.session.header?.cwd) {
+      const lastUserMessageId = lastUserMessage?.id ?? `${payload.agent.session.header.id}:${payload.turn}:${payload.step}`
+      const defaults = DEFAULT_STRATEGIES[intent]
+      const strategy: StrategyDecision = {
+        source: 'model-router',
+        messageId: lastUserMessageId,
+        intent,
+        confidence: lastUser ? classifyIntent(lastUser, strategies).confidence : 0,
+        model,
+        requestedReasoningEffort: callConfig.reasoningEffort ?? '',
+        effectiveReasoningEffort: callConfig.reasoningEffort,
+        budgetClass: defaults.budgetClass,
+        riskClass: defaults.riskClass,
+        fallbackReason: `model-upgrade:${decision.reason}`,
+        evidenceRefs: [],
+      }
+      appendFact(payload.agent.session as Session, 'oh-my-dsh/strategy', strategy)
+    }
+
     // 只改 model，provider 与其余字段原样保留（PRD AC-6）
-    return { ...callConfig, model: decision.upgrade ? config.proModel : config.defaultModel }
+    return { ...callConfig, model }
   })
 }
