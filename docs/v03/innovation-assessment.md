@@ -2,10 +2,10 @@
 
 > 评估人：Codex（gpt-5.6-luna, xhigh）· 交付总监复核
 > 日期：2026-08-14
-> 结论基线：oh-my-dsh v0.2.0（4 插件，110/110 测试通过）
+> 结论基线：oh-my-dsh v0.2.0（4 插件，111/111 测试通过）
 > 证据域：论文 18 篇创新点文章 + zh/theory + README + oh-my-dsh src/ + dsh v0.1.0-rc.5 源码
 
----
+***
 
 ## 1. 执行摘要：一页价值地图
 
@@ -25,15 +25,17 @@ oh-my-dsh v0.2 已经形成四个可工作的“控制点插件”：
 - 未做：I-02、I-05、I-06、I-07、I-09、I-11、I-12、I-13、I-14、I-15、I-16。
 - 应该优先补的不是更多提示词，而是事件接缝正确性、风险审查、证据化 checkpoint、能力感知路由和范围变更治理。
 
+llm-harness-agent/zh/innovations是原本18个创新点的文章所在目录。
+
 ### 1.2 价值地图
 
-| 价值层 | 创新点 | oh-my-dsh 当前状态 | dsh 可用接缝 | v0.3 最小价值 | 主要风险 |
-|---|---|---|---|---|---|
-| 安全与可恢复 | I-01、I-07、I-08、I-11 | 约束拒绝已有，审查、范围契约、checkpoint缺失 | tools/pre-execute、agent/turn-stopping、session/event、session/flush、fork | 高风险操作先阻断或要求证据；可恢复、可审计 | 只做提示会产生“安全幻觉” |
-| 决策与路由 | I-10、I-17、I-16 | 关键词路由和模型升级已有，能力探针缺失 | agent/request、llm/stream、模型 reasoning capability | 路由结果变成可解释、可验证的策略包 | 关键词误判；把 requested effort 当成 effective effort |
-| 上下文与成本 | I-03、I-04、I-05、I-12、I-13、I-18 | token 粗估和静态注入已有 | system-prompt/assemble、request header、compaction、agent-instructions | 稳定区、活跃区、证据区分层；动态上下文有来源和TTL | 追加文本造成漂移、重复和缓存失效 |
-| 计划与学习 | I-02、I-06、I-09、I-14 | 无可验证运行时 | goal、plan-mode、skills、reasoning blocks、session log | 计划、技能、推理策略均有审批和回滚边界 | 自动自演化扩大权限与不可控变更 |
-| 实验研究 | I-15、I-16、I-13 | 无默认实现 | dsh 工具 schema、adapter、usage、header | 作为隔离实验验证编码、探针和缓存假设 | 未证协议、供应商兼容性和不可复现 |
+| 价值层    | 创新点                           | oh-my-dsh 当前状态              | dsh 可用接缝                                                               | v0.3 最小价值                  | 主要风险                                         |
+| ------ | ----------------------------- | --------------------------- | ---------------------------------------------------------------------- | -------------------------- | -------------------------------------------- |
+| 安全与可恢复 | I-01、I-07、I-08、I-11           | 约束拒绝已有，审查、范围契约、checkpoint缺失 | tools/pre-execute、agent/turn-stopping、session/event、session/flush、fork | 高风险操作先阻断或要求证据；可恢复、可审计      | 只做提示会产生“安全幻觉”                                |
+| 决策与路由  | I-10、I-17、I-16                | 关键词路由和模型升级已有，能力探针缺失         | agent/request、llm/stream、模型 reasoning capability                       | 路由结果变成可解释、可验证的策略包          | 关键词误判；把 requested effort 当成 effective effort |
+| 上下文与成本 | I-03、I-04、I-05、I-12、I-13、I-18 | token 粗估和静态注入已有             | system-prompt/assemble、request header、compaction、agent-instructions    | 稳定区、活跃区、证据区分层；动态上下文有来源和TTL | 追加文本造成漂移、重复和缓存失效                             |
+| 计划与学习  | I-02、I-06、I-09、I-14           | 无可验证运行时                     | goal、plan-mode、skills、reasoning blocks、session log                     | 计划、技能、推理策略均有审批和回滚边界        | 自动自演化扩大权限与不可控变更                              |
+| 实验研究   | I-15、I-16、I-13                | 无默认实现                       | dsh 工具 schema、adapter、usage、header                                     | 作为隔离实验验证编码、探针和缓存假设         | 未证协议、供应商兼容性和不可复现                             |
 
 ### 1.3 三个必须修正的认识
 
@@ -41,7 +43,7 @@ oh-my-dsh v0.2 已经形成四个可工作的“控制点插件”：
 
 第二，I-07 不是“KV occupancy 驱动的简单模型切换”。原文 07-review-switching.md:15-34,80-152,156-302 的核心是 Review Router：变更或决策 → 风险等级 → 证据完整度 → 可逆性与爆炸半径 → 上下文健康 → Review Mode → 绑定证据的 Verdict。模型切换至多是审查策略中的一个执行动作，不能替代风险分类、证据规范和否决路径。
 
-第三，I-11 不是“把摘要再存一次”，也不是 session/flush 的同义词。原文 11-checkpoint-review.md:15-28,34-91,95-168,181-280 要求版本化、可验证、可恢复的状态快照，包含 workspace hash、plan version、changeset、artifact hash、测试、审批、错误、恢复前提，并让 verdict 绑定 checkpoint 和 hash。dsh 的 session/flush 是持久化耐久点；compaction checkpoint 是压缩溯源标记；二者都是接缝，不等于 I-11 完成。
+第三，I-11 不是“把摘要再存一次”，也不是 session/flush 的同义词。原文 11-checkpoint-review\.md:15-28,34-91,95-168,181-280 要求版本化、可验证、可恢复的状态快照，包含 workspace hash、plan version、changeset、artifact hash、测试、审批、错误、恢复前提，并让 verdict 绑定 checkpoint 和 hash。dsh 的 session/flush 是持久化耐久点；compaction checkpoint 是压缩溯源标记；二者都是接缝，不等于 I-11 完成。
 
 ### 1.4 验证基线
 
@@ -64,51 +66,50 @@ dsh 的 waterfall 事件要求插件调用 next()，否则后续监听器可能�
 
 如果这些监听器处在会截断链路的位置，plan、时间、文件指令或其他上下文插件可能被跳过。该问题是 v0.3 的 P0，不应通过增加更多 prompt 文案掩盖。
 
----
+***
 
 ## 2. 18个创新点逐条评估表
 
 表中“能否做进 oh-my-dsh”指产品归属判断；“已做”只统计 oh-my-dsh，不把 dsh 底座算作已完成。
 
-| 编号 | 核心 | 能否做进 oh-my-dsh | 是否已做：代码对照 | dsh源码接缝：文件:行号 | 优先级 |
-|---|---|---|---|---|---|
-| I-01 Agent Immune System | 事件→保留证据→诊断→提出修复→验证→审批→灰度→监控→回滚的闭环；重点是边界、审计和恢复，不是单纯拒绝。 | 能；应作为安全控制平面 | 半做。src/constraint-immune/index.ts:36-107 保存约束、提醒违反；:109-137 在 tools/pre-execute 拒绝负面约束；但没有事件账本、诊断、修复提案、验证、审批、灰度、回滚。 | packages/core/tools/src/index.ts:1463-1505；packages/core/agent/src/runtime-types.ts:246-290；packages/core/session/src/index.ts:66-85 | P0 |
-| I-02 Meta Requests / 双向代理 | 模型或用户可提出“请求技能、请求自检、请求升级”等元请求；每项请求必须结构化、可策略判定、可审计、可拒绝。 | 能；适合做成工具与事件协议 | 半做。src/cognition-gate/injector.ts:3-12 只在提示词中写 /propose_skill、/trigger_self_review；没有同名工具、schema、执行器、审批或结果事件。 | packages/core/agent/src/runtime-types.ts:232-244；packages/core/tools/src/index.ts:142-175,582-600；packages/core/agent/src/runtime-types.ts:135-143 | P1 |
-| I-03 Attention Budget | 把上下文预算分成稳定约束、额外证据、活跃工作集、外部索引，并按任务风险和阶段分配；不是简单截断历史。 | 能；应先做软预算再做硬裁剪 | 半做。src/shared/messages.ts:21-29 只按字符除以4估算；src/model-router/index.ts:54-78 用 token 估算触发升级；cognition-gate 只做 full/brief；没有四区预算、淘汰策略或效果测量。 | packages/core/system-prompt/src/index.ts:457-542；packages/llm/token-meter/src/estimate.ts:12-87；packages/llm/token-meter/src/projection.ts:30-75；packages/compaction/compaction/src/index.ts:87-169 | P0 |
-| I-04 Stable Constraints / Compressible History | 稳定约束进入稳定前缀，历史压缩必须保持结构与可追溯性，以降低缓存抖动和约束丢失。 | 能；依赖 dsh 的 canonical header 和 compaction 底座 | 半做。constraint-immune 保存约束并在运行时提醒或拒绝，但没有稳定区编译、约束版本、压缩前后校验和缓存命中指标。 | packages/core/agent-loop/src/agent.ts:407-494；packages/core/session/src/request-header.ts:1-70；packages/compaction/compaction/src/index.ts:119-169 | P1 |
-| I-05 Agent-readable Docs | 将文档编译成任务可消费的结构：触发条件、输入、输出、边界、证据和恢复；不是把 README 全塞进 prompt。 | 能；但应是文档编译器或 provider，不宜堆在四插件中 | 未做。当前没有文档 section 编译、触发索引、版本和证据字段。dsh 的 agent-instructions 是相关动态上下文能力，不等于 oh-my-dsh 已有文档编译。 | packages/core/system-prompt/src/index.ts:373-455,457-542；packages/context/agent-instructions/src/index.ts:1-7,322-366 | P2 |
-| I-06 PlanGraph / 计划级联 | 目标、计划、步骤、依赖、验收和证据形成可暂停、可恢复、可重排的图，而不是线性 TODO 文本。 | 能；可复用 dsh goal/plan 底座 | 未做。dsh 有 goal 和 plan-mode，但 oh 没有 PlanGraph、typed edge、step evidence、依赖失效传播或验收状态。 | packages/goal/goal/src/types.ts:15-83；packages/goal/goal/src/domain.ts:61-67；packages/plan/plan-mode/src/index.ts:46-54,180-265,425-460 | P1 |
-| I-07 Risk / Evidence Review Router | 按风险 R0-R4、爆炸半径、可逆性、证据完整度、上下文健康选择 M0-M5 审查模式，输出绑定证据的结构化 Verdict。 | 能；是 v0.3 的核心价值，但不能简化为模型切换 | 未做。当前没有风险分类、blast radius、evidence spec、independent review、human approval、reject/defer 或 hash-bound verdict；四插件也没有通用审查编排器。 | packages/core/agent/src/runtime-types.ts:232-290；packages/core/tools/src/index.ts:1463-1505；packages/core/agent-loop/src/agent.ts:381-399；packages/core/agent/src/runtime-types.ts:262-278 | P0 |
-| I-08 Scope Change Governance | 对范围变化分类为澄清、补充、替换、越界；比较目标、成本、风险、证据和验收影响，要求用户确认或自动拒绝。 | 能；应与 constraint 和 review 共用账本 | 半做。constraint-immune 能识别约束和负面工具风险；cognition-gate/injector.ts:3-12 仅提示 I-08；没有 Scope Contract、变更提案、预算影响和 verdict。 | packages/core/agent/src/runtime-types.ts:219-244；packages/core/tools/src/index.ts:142-175；packages/core/session/src/index.ts:66-76；packages/core/agent/src/runtime-types.ts:262-278 | P0 |
-| I-09 Governed Skill Supply Chain | 技能从候选→草案→测试→审批→灰度→观测→撤销，供应链每一步都有权限与证据。 | 能；但不能默认自动自演化 | 未做。dsh 有 ctx.skills、filesystem provider 和 change 事件，但 oh 没有候选生成、草案、测试、审批、灰度、撤销或能力边界。 | packages/skill/skill/src/index.ts:38-101,284-297；packages/skill/skill-filesystem/src/index.ts:1-7,129-143；packages/core/tools/src/index.ts:142-175 | P2 |
-| I-10 Intent→Strategy | 用意图、风险、复杂度、约束和能力把请求映射到可解释策略包，而不是只匹配一个关键词；7+1 是策略空间，不是完成度证明。 | 能；现有插件是直接入口 | 半做，接近骨架已做。src/intent-router/classifier.ts:13-68 有 7+1 关键词分类和 confidence；strategies.ts:3-44 有策略表；index.ts:47-66 在 agent/request 改 effort。但缺少多轴特征、策略包、可解释证据、动态降级和结果反馈；也没有真正设置 token budget。 | packages/core/agent/src/runtime-types.ts:232-244；packages/core/agent-loop/src/agent.ts:407-455；packages/llm/llm/src/call-config.ts:1-59 | P0 |
-| I-11 Traceable Checkpoint | 版本化、可验证、可恢复的状态快照；checkpoint 绑定 workspace、plan、changeset、artifact、test、approval 和恢复前提；摘要只是索引。 | 能；必须先做最小可恢复账本 | 未做。oh 没有 checkpoint schema、hash chain、artifact index、restore precondition、review verdict 或 invalidation。dsh session/flush 仅是耐久刷新，compaction/checkpoint 仅是压缩溯源。 | packages/core/session/src/index.ts:66-85,1068-1095；packages/session/session-checkpoint-policy/src/index.ts:1-83；packages/compaction/compaction/src/checkpoint.ts:19-50 | P0 |
-| I-12 Scoped Memory | 记忆按作用域、时效、可信度、可撤销性和证据分层；不同任务不得把局部经验污染为全局事实。 | 能；可落在 session/plugin provider | 未做。当前没有 memory schema、scope、TTL、provenance、confidence、forget/revoke 或检索策略。dsh skills 和 system prompt 可提供接缝，但不是 memory 实现。 | packages/core/session/src/types.ts:252-335；packages/core/session/src/index.ts:66-76；packages/skill/skill/src/index.ts:55-101；packages/core/system-prompt/src/index.ts:392-407 | P1 |
-| I-13 Constrained Byte Stability | 对稳定前缀、动态区、证据区进行字节级布局约束；明确哪些变化会使缓存失效，并用命中率、延迟和成本验证。 | 能；但属于实验性基础设施，不应先做表面优化 | 未做。dsh 有 canonical request header 和 header equality，可作为底座；oh 没有 segment compiler、byte layout、invalidation reason 或 cache hit measurement。 | packages/core/session/src/request-header.ts:1-70；packages/core/system-prompt/src/index.ts:457-542；packages/llm/token-meter/src/estimate.ts:56-87 | P2 |
-| I-14 Reasoning Replay Policy | 将推理内容按策略分为保留、压缩、脱敏、重放或不暴露；关注可审计性、隐私和供应商差异，不等于无条件把 reasoning 剥掉。 | 能；应做 provider-neutral policy 层 | 未做。oh 只在 intent/model router 中写 reasoning effort；没有 reasoning block policy、replay metadata、脱敏、可见性和证据绑定。 | packages/llm/llm/src/types.ts:53-63,127-141,252-280；packages/llm/llm/src/index.ts:51-65；packages/llm/llm-deepseek/src/translate.ts:1-8,45-75 | P1 |
-| I-15 DSML Tool-call Optimization | 研究一种工具调用编码或中间表示以降低 token 和解析成本，同时保留 schema、错误和安全边界；需要真实协议、模型和基准，不应把研究编码硬塞进默认客户端。 | 可做隔离研究适配；不建议做进默认 oh-my-dsh 执行链 | 未做；产品默认路径不做。dsh 已有标准 ToolCall/ToolResult 和工具 schema，DeepSeek adapter 负责 SSE 翻译；没有 DSML 协议证据和端到端收益基准。 | packages/llm/llm/src/types.ts:77-105；packages/core/tools/src/index.ts:703-711；packages/llm/llm-deepseek/src/translate.ts:1-75 | 不做（默认路径） |
-| I-16 Quick Instruction Capability Probe | 用低成本、可验证的探针发现模型对快速指令路由、结构化输出或特定能力的真实支持，并缓存结果；失败要安全降级。 | 能；仅作独立探针插件 | 未做。当前没有 probe schema、版本化能力缓存、支持/拒绝/不确定状态或 fallback；不能假设某 provider 暴露未证的快捷接口。 | packages/llm/llm/src/index.ts:227-338；packages/llm/llm/src/types.ts:252-280；packages/core/agent/src/runtime-types.ts:232-244；packages/llm/llm-deepseek/src/adapter.ts:95-105 | P2（仅探针） |
-| I-17 Reasoning Effort Control | 将任务策略、模型能力、请求 effort、实际 effective effort、token/延迟/质量证据连接起来；unsupported effort 必须降级并记录。 | 能；是当前路由的硬化方向 | 半做。intent-router/index.ts:47-66 覆写 reasoningEffort；model-router/index.ts:81-120 选择 model；但未检查 capability、未记录 requested/effective、未使用 usage 反馈，且 effortMap 不覆盖 simple/spec_driven。 | packages/llm/llm/src/call-config.ts:1-59；packages/llm/llm/src/types.ts:252-280；packages/llm/llm-deepseek/src/adapter.ts:95-105；packages/llm/llm-pi-ai/src/adapter.ts:130-165,276-317 | P0 |
-| I-18 Dynamic Context Position Experiment | 动态上下文应按任务阶段、信任级别、时效和位置实验注入；要比较前置、后置、工具结果附近的效果，并记录来源。 | 能；当前注入可升级为安全上下文 provider | 半做。cognition-gate/injector.ts:39-75 每步向最后用户消息追加 full/brief 静态提示；缺少 source、TTL、scope、position experiment、重复检测和效果指标。dsh time-context 与 agent-instructions 已展示正确的动态上下文模式。 | packages/core/system-prompt/src/index.ts:392-407,457-542；packages/context/time-context/src/index.ts:139-208；packages/context/agent-instructions/src/index.ts:322-366；packages/core/agent/src/runtime-types.ts:135-143 | P1 |
-
-
+| 编号                                             | 核心                                                                                           | 能否做进 oh-my-dsh                              | 是否已做：代码对照                                                                                                                                                                                 | dsh源码接缝：文件:行号                                                                                                                                                                                                         | 优先级      |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| I-01 Agent Immune System                       | 事件→保留证据→诊断→提出修复→验证→审批→灰度→监控→回滚的闭环；重点是边界、审计和恢复，不是单纯拒绝。                                        | 能；应作为安全控制平面                                 | 半做。src/constraint-immune/index.ts:36-107 保存约束、提醒违反；:109-137 在 tools/pre-execute 拒绝负面约束；但没有事件账本、诊断、修复提案、验证、审批、灰度、回滚。                                                                       | packages/core/tools/src/index.ts:1463-1505；packages/core/agent/src/runtime-types.ts:246-290；packages/core/session/src/index.ts:66-85                                                                                  | P0       |
+| I-02 Meta Requests / 双向代理                      | 模型或用户可提出“请求技能、请求自检、请求升级”等元请求；每项请求必须结构化、可策略判定、可审计、可拒绝。                                        | 能；适合做成工具与事件协议                               | 半做。src/cognition-gate/injector.ts:3-12 只在提示词中写 /propose\_skill、/trigger\_self\_review；没有同名工具、schema、执行器、审批或结果事件。                                                                          | packages/core/agent/src/runtime-types.ts:232-244；packages/core/tools/src/index.ts:142-175,582-600；packages/core/agent/src/runtime-types.ts:135-143                                                                    | P1       |
+| I-03 Attention Budget                          | 把上下文预算分成稳定约束、额外证据、活跃工作集、外部索引，并按任务风险和阶段分配；不是简单截断历史。                                           | 能；应先做软预算再做硬裁剪                               | 半做。src/shared/messages.ts:21-29 只按字符除以4估算；src/model-router/index.ts:54-78 用 token 估算触发升级；cognition-gate 只做 full/brief；没有四区预算、淘汰策略或效果测量。                                                   | packages/core/system-prompt/src/index.ts:457-542；packages/llm/token-meter/src/estimate.ts:12-87；packages/llm/token-meter/src/projection.ts:30-75；packages/compaction/compaction/src/index.ts:87-169                   | P0       |
+| I-04 Stable Constraints / Compressible History | 稳定约束进入稳定前缀，历史压缩必须保持结构与可追溯性，以降低缓存抖动和约束丢失。                                                     | 能；依赖 dsh 的 canonical header 和 compaction 底座 | 半做。constraint-immune 保存约束并在运行时提醒或拒绝，但没有稳定区编译、约束版本、压缩前后校验和缓存命中指标。                                                                                                                          | packages/core/agent-loop/src/agent.ts:407-494；packages/core/session/src/request-header.ts:1-70；packages/compaction/compaction/src/index.ts:119-169                                                                    | P1       |
+| I-05 Agent-readable Docs                       | 将文档编译成任务可消费的结构：触发条件、输入、输出、边界、证据和恢复；不是把 README 全塞进 prompt。                                    | 能；但应是文档编译器或 provider，不宜堆在四插件中               | 未做。当前没有文档 section 编译、触发索引、版本和证据字段。dsh 的 agent-instructions 是相关动态上下文能力，不等于 oh-my-dsh 已有文档编译。                                                                                               | packages/core/system-prompt/src/index.ts:373-455,457-542；packages/context/agent-instructions/src/index.ts:1-7,322-366                                                                                                 | P2       |
+| I-06 PlanGraph / 计划级联                          | 目标、计划、步骤、依赖、验收和证据形成可暂停、可恢复、可重排的图，而不是线性 TODO 文本。                                              | 能；可复用 dsh goal/plan 底座                      | 未做。dsh 有 goal 和 plan-mode，但 oh 没有 PlanGraph、typed edge、step evidence、依赖失效传播或验收状态。                                                                                                         | packages/goal/goal/src/types.ts:15-83；packages/goal/goal/src/domain.ts:61-67；packages/plan/plan-mode/src/index.ts:46-54,180-265,425-460                                                                               | P1       |
+| I-07 Risk / Evidence Review Router             | 按风险 R0-R4、爆炸半径、可逆性、证据完整度、上下文健康选择 M0-M5 审查模式，输出绑定证据的结构化 Verdict。                              | 能；是 v0.3 的核心价值，但不能简化为模型切换                   | 未做。当前没有风险分类、blast radius、evidence spec、independent review、human approval、reject/defer 或 hash-bound verdict；四插件也没有通用审查编排器。                                                                 | packages/core/agent/src/runtime-types.ts:232-290；packages/core/tools/src/index.ts:1463-1505；packages/core/agent-loop/src/agent.ts:381-399；packages/core/agent/src/runtime-types.ts:262-278                            | P0       |
+| I-08 Scope Change Governance                   | 对范围变化分类为澄清、补充、替换、越界；比较目标、成本、风险、证据和验收影响，要求用户确认或自动拒绝。                                          | 能；应与 constraint 和 review 共用账本               | 半做。constraint-immune 能识别约束和负面工具风险；cognition-gate/injector.ts:3-12 仅提示 I-08；没有 Scope Contract、变更提案、预算影响和 verdict。                                                                          | packages/core/agent/src/runtime-types.ts:219-244；packages/core/tools/src/index.ts:142-175；packages/core/session/src/index.ts:66-76；packages/core/agent/src/runtime-types.ts:262-278                                   | P0       |
+| I-09 Governed Skill Supply Chain               | 技能从候选→草案→测试→审批→灰度→观测→撤销，供应链每一步都有权限与证据。                                                       | 能；但不能默认自动自演化                                | 未做。dsh 有 ctx.skills、filesystem provider 和 change 事件，但 oh 没有候选生成、草案、测试、审批、灰度、撤销或能力边界。                                                                                                      | packages/skill/skill/src/index.ts:38-101,284-297；packages/skill/skill-filesystem/src/index.ts:1-7,129-143；packages/core/tools/src/index.ts:142-175                                                                    | P2       |
+| I-10 Intent→Strategy                           | 用意图、风险、复杂度、约束和能力把请求映射到可解释策略包，而不是只匹配一个关键词；7+1 是策略空间，不是完成度证明。                                  | 能；现有插件是直接入口                                 | 半做，接近骨架已做。src/intent-router/classifier.ts:13-68 有 7+1 关键词分类和 confidence；strategies.ts:3-44 有策略表；index.ts:47-66 在 agent/request 改 effort。但缺少多轴特征、策略包、可解释证据、动态降级和结果反馈；也没有真正设置 token budget。 | packages/core/agent/src/runtime-types.ts:232-244；packages/core/agent-loop/src/agent.ts:407-455；packages/llm/llm/src/call-config.ts:1-59                                                                               | P0       |
+| I-11 Traceable Checkpoint                      | 版本化、可验证、可恢复的状态快照；checkpoint 绑定 workspace、plan、changeset、artifact、test、approval 和恢复前提；摘要只是索引。 | 能；必须先做最小可恢复账本                               | 未做。oh 没有 checkpoint schema、hash chain、artifact index、restore precondition、review verdict 或 invalidation。dsh session/flush 仅是耐久刷新，compaction/checkpoint 仅是压缩溯源。                            | packages/core/session/src/index.ts:66-85,1068-1095；packages/session/session-checkpoint-policy/src/index.ts:1-83；packages/compaction/compaction/src/checkpoint.ts:19-50                                                | P0       |
+| I-12 Scoped Memory                             | 记忆按作用域、时效、可信度、可撤销性和证据分层；不同任务不得把局部经验污染为全局事实。                                                  | 能；可落在 session/plugin provider               | 未做。当前没有 memory schema、scope、TTL、provenance、confidence、forget/revoke 或检索策略。dsh skills 和 system prompt 可提供接缝，但不是 memory 实现。                                                                 | packages/core/session/src/types.ts:252-335；packages/core/session/src/index.ts:66-76；packages/skill/skill/src/index.ts:55-101；packages/core/system-prompt/src/index.ts:392-407                                         | P1       |
+| I-13 Constrained Byte Stability                | 对稳定前缀、动态区、证据区进行字节级布局约束；明确哪些变化会使缓存失效，并用命中率、延迟和成本验证。                                           | 能；但属于实验性基础设施，不应先做表面优化                       | 未做。dsh 有 canonical request header 和 header equality，可作为底座；oh 没有 segment compiler、byte layout、invalidation reason 或 cache hit measurement。                                                 | packages/core/session/src/request-header.ts:1-70；packages/core/system-prompt/src/index.ts:457-542；packages/llm/token-meter/src/estimate.ts:56-87                                                                      | P2       |
+| I-14 Reasoning Replay Policy                   | 将推理内容按策略分为保留、压缩、脱敏、重放或不暴露；关注可审计性、隐私和供应商差异，不等于无条件把 reasoning 剥掉。                              | 能；应做 provider-neutral policy 层              | 未做。oh 只在 intent/model router 中写 reasoning effort；没有 reasoning block policy、replay metadata、脱敏、可见性和证据绑定。                                                                                   | packages/llm/llm/src/types.ts:53-63,127-141,252-280；packages/llm/llm/src/index.ts:51-65；packages/llm/llm-deepseek/src/translate.ts:1-8,45-75                                                                          | P1       |
+| I-15 DSML Tool-call Optimization               | 研究一种工具调用编码或中间表示以降低 token 和解析成本，同时保留 schema、错误和安全边界；需要真实协议、模型和基准，不应把研究编码硬塞进默认客户端。             | 可做隔离研究适配；不建议做进默认 oh-my-dsh 执行链              | 未做；产品默认路径不做。dsh 已有标准 ToolCall/ToolResult 和工具 schema，DeepSeek adapter 负责 SSE 翻译；没有 DSML 协议证据和端到端收益基准。                                                                                      | packages/llm/llm/src/types.ts:77-105；packages/core/tools/src/index.ts:703-711；packages/llm/llm-deepseek/src/translate.ts:1-75                                                                                         | 不做（默认路径） |
+| I-16 Quick Instruction Capability Probe        | 用低成本、可验证的探针发现模型对快速指令路由、结构化输出或特定能力的真实支持，并缓存结果；失败要安全降级。                                        | 能；仅作独立探针插件                                  | 未做。当前没有 probe schema、版本化能力缓存、支持/拒绝/不确定状态或 fallback；不能假设某 provider 暴露未证的快捷接口。                                                                                                              | packages/llm/llm/src/index.ts:227-338；packages/llm/llm/src/types.ts:252-280；packages/core/agent/src/runtime-types.ts:232-244；packages/llm/llm-deepseek/src/adapter.ts:95-105                                          | P2（仅探针）  |
+| I-17 Reasoning Effort Control                  | 将任务策略、模型能力、请求 effort、实际 effective effort、token/延迟/质量证据连接起来；unsupported effort 必须降级并记录。       | 能；是当前路由的硬化方向                                | 半做。intent-router/index.ts:47-66 覆写 reasoningEffort；model-router/index.ts:81-120 选择 model；但未检查 capability、未记录 requested/effective、未使用 usage 反馈，且 effortMap 不覆盖 simple/spec\_driven。        | packages/llm/llm/src/call-config.ts:1-59；packages/llm/llm/src/types.ts:252-280；packages/llm/llm-deepseek/src/adapter.ts:95-105；packages/llm/llm-pi-ai/src/adapter.ts:130-165,276-317                                  | P0       |
+| I-18 Dynamic Context Position Experiment       | 动态上下文应按任务阶段、信任级别、时效和位置实验注入；要比较前置、后置、工具结果附近的效果，并记录来源。                                         | 能；当前注入可升级为安全上下文 provider                    | 半做。cognition-gate/injector.ts:39-75 每步向最后用户消息追加 full/brief 静态提示；缺少 source、TTL、scope、position experiment、重复检测和效果指标。dsh time-context 与 agent-instructions 已展示正确的动态上下文模式。                    | packages/core/system-prompt/src/index.ts:392-407,457-542；packages/context/time-context/src/index.ts:139-208；packages/context/agent-instructions/src/index.ts:322-366；packages/core/agent/src/runtime-types.ts:135-143 | P1       |
 
 exec
-/bin/zsh -lc "printf '%s\\n' '
+/bin/zsh -lc "printf '%s\n' '
+
 ## 3. 差异分析：已做、半做、未做
 
 ### 3.1 已做：可运行的基础能力，但不是完整创新闭环
 
 严格按“完整创新点”定义，18项中没有一项可以直接标为完整已做。以下是已经有代码和测试支撑的子能力：
 
-| 已有子能力 | 代码证据 | 证据等级 | 边界 |
-|---|---|---|---|
-| 约束提取与负向工具拒绝 | src/constraint-immune/extractor.ts:1-98；src/constraint-immune/index.ts:109-137 | A1 | 具备提醒和拒绝，不具备事件账本、风险级别、审批、恢复和回滚 |
-| 7+1 意图分类骨架 | src/intent-router/classifier.ts:13-68；src/intent-router/strategies.ts:3-44 | A1 | 关键词分类，不是多轴策略决策；未验证语义误判和跨语言鲁棒性 |
-| agent/request 路由接缝 | src/intent-router/index.ts:47-66 | A1 | 接缝选对了；没有 live dsh E2E，不能宣称当前运行时全部成立 |
-| 模型升级和 effort 修改骨架 | src/model-router/index.ts:54-120；src/intent-router/index.ts:61-65 | A1 | 没有 capability-aware、requested/effective 对账和实际质量反馈 |
-| full/brief 认知提示 | src/cognition-gate/injector.ts:3-12,39-75 | A1 | 属于静态提示注入；不是动态证据上下文，也不是 I-02 的真正元请求 |
-| 插件打包和挂载配置 | cordis.patch.yml:1-30；package.json:1-29 | A1/A2 | 证明构建和配置声明存在，不证明真实 dsh 安装与事件链正确 |
+| 已有子能力              | 代码证据                                                                           | 证据等级  | 边界                                                |
+| ------------------ | ------------------------------------------------------------------------------ | ----- | ------------------------------------------------- |
+| 约束提取与负向工具拒绝        | src/constraint-immune/extractor.ts:1-98；src/constraint-immune/index.ts:109-137 | A1    | 具备提醒和拒绝，不具备事件账本、风险级别、审批、恢复和回滚                     |
+| 7+1 意图分类骨架         | src/intent-router/classifier.ts:13-68；src/intent-router/strategies.ts:3-44     | A1    | 关键词分类，不是多轴策略决策；未验证语义误判和跨语言鲁棒性                     |
+| agent/request 路由接缝 | src/intent-router/index.ts:47-66                                               | A1    | 接缝选对了；没有 live dsh E2E，不能宣称当前运行时全部成立               |
+| 模型升级和 effort 修改骨架  | src/model-router/index.ts:54-120；src/intent-router/index.ts:61-65              | A1    | 没有 capability-aware、requested/effective 对账和实际质量反馈 |
+| full/brief 认知提示    | src/cognition-gate/injector.ts:3-12,39-75                                      | A1    | 属于静态提示注入；不是动态证据上下文，也不是 I-02 的真正元请求                |
+| 插件打包和挂载配置          | cordis.patch.yml:1-30；package.json:1-29                                        | A1/A2 | 证明构建和配置声明存在，不证明真实 dsh 安装与事件链正确                    |
 
 现有测试是重要正证据，但其范围必须准确描述。110 个测试通过说明这些本地函数、插件接口替身和配置静态检查没有回归；它不能证明：
 
@@ -155,7 +156,7 @@ dsh 已提供更合适的能力：system-prompt/assemble 负责 canonical sectio
 3. requested reasoning effort 没有和 provider/model 的 supported capability 对账；
 4. model-router 的不满意度 streak 可能在工具循环中反复读取相同的最后用户消息，v0.2 文档也承认应按 message ID 优化。
 
-此外，当前 effortMap 只覆盖 architecture、research、collaboration、refactor、new、medium 等部分意图，不覆盖 simple 和 spec_driven。README 若声称 7+1 都有 reasoning effort/token budget 策略，源码并不完全支持；该说法应降为“部分意图有 effort 路由骨架”。
+此外，当前 effortMap 只覆盖 architecture、research、collaboration、refactor、new、medium 等部分意图，不覆盖 simple 和 spec\_driven。README 若声称 7+1 都有 reasoning effort/token budget 策略，源码并不完全支持；该说法应降为“部分意图有 effort 路由骨架”。
 
 #### D. I-08：约束不是范围契约
 
@@ -196,12 +197,12 @@ dsh 的 session-checkpoint-policy 在 llm/stream、tools/execute、agent/pre-ste
 
 ### 3.3 未做或明确不做
 
-| 分组 | 创新点 | 判断与原因 |
-|---|---|---|
-| v0.3 以后再做 | I-02、I-05、I-06、I-09、I-12、I-13、I-14、I-16 | dsh 有接缝，但每项都要求新 schema、持久状态或实验验证；直接塞进当前四插件会扩大范围并削弱可验证性 |
-| 研究隔离 | I-15 | DSML 没有足够的真实协议和端到端收益证据；默认链路应保持标准 ToolCall/ToolResult 和 provider adapter |
-| 现有实现不可称完整 | I-01、I-03、I-04、I-08、I-10、I-17、I-18 | 只有局部动作，没有闭环、证据或指标 |
-| 需要 dsh 接缝增强才完整 | I-07、I-11 | 当前接缝足以做最小版，但完整的独立审查、恢复、verdict 需要更明确的协议 |
+| 分组             | 创新点                                     | 判断与原因                                                                   |
+| -------------- | --------------------------------------- | ----------------------------------------------------------------------- |
+| v0.3 以后再做      | I-02、I-05、I-06、I-09、I-12、I-13、I-14、I-16 | dsh 有接缝，但每项都要求新 schema、持久状态或实验验证；直接塞进当前四插件会扩大范围并削弱可验证性                  |
+| 研究隔离           | I-15                                    | DSML 没有足够的真实协议和端到端收益证据；默认链路应保持标准 ToolCall/ToolResult 和 provider adapter |
+| 现有实现不可称完整      | I-01、I-03、I-04、I-08、I-10、I-17、I-18      | 只有局部动作，没有闭环、证据或指标                                                       |
+| 需要 dsh 接缝增强才完整 | I-07、I-11                               | 当前接缝足以做最小版，但完整的独立审查、恢复、verdict 需要更明确的协议                                 |
 
 ### 3.4 关键差异的优先级判断
 
@@ -231,7 +232,7 @@ P2 是高成本、研究性或依赖真实基准的能力：
 - I-16 capability probe；
 - I-15 DSML 默认路径明确不做。
 
----
+***
 
 ## 4. v0.3 及以后产品规划：具体到最小落地形态
 
@@ -281,7 +282,7 @@ P2 是高成本、研究性或依赖真实基准的能力：
 
 验收条件：
 
-- simple、spec_driven、research 等 8 类都有显式默认策略；
+- simple、spec\_driven、research 等 8 类都有显式默认策略；
 - 不支持的 effort 不会静默假装成功；
 - 路由决策可以从日志复原；
 - 现有 classifier、model-router 单元测试继续通过。
@@ -420,7 +421,7 @@ P2 是高成本、研究性或依赖真实基准的能力：
 
 最小落地形态：
 
-- I-02：注册两个真实工具或 command handler：propose_skill、request_review；工具参数必须是 schema，结果写 session event；默认只能提出请求，不能自授权。
+- I-02：注册两个真实工具或 command handler：propose\_skill、request\_review；工具参数必须是 schema，结果写 session event；默认只能提出请求，不能自授权。
 - I-04：把约束保存为版本化 stable section；compaction 后检查约束摘要和版本是否一致。
 - I-18：动态上下文改为 section/context provider，带 source、scope、ttl、position，不再每步无条件追加到最后 user message。
 - 补充系统 prompt assemble 的重复检测和来源标记。
@@ -542,7 +543,7 @@ v0.3 不能只以“测试数量增加”验收，应同时满足：
 - 运行失败、重试、暂停、fork、恢复测试；
 - 每个创新点的文档状态只能写“已做、半做、未做、研究中”，不得用提示词存在替代运行时完成。
 
----
+***
 
 ## 5. 附录：dsh源码接缝证据索引
 
@@ -550,64 +551,64 @@ v0.3 不能只以“测试数量增加”验收，应同时满足：
 
 ### 5.1 事件生命周期接缝
 
-| 接缝 | 源码位置 | 语义 | 直接支持的创新点 |
-|---|---|---|---|
-| agent/session-start | packages/core/agent/src/runtime-types.ts:206-217 | session 启动生命周期 | I-11、I-12、I-18 |
-| agent/pre-step | packages/core/agent/src/runtime-types.ts:219-231 | waterfall，可替换 model-visible messages；payload 有 agent、messages、turn、step、signal | I-03、I-04、I-07、I-08、I-18 |
-| agent/request | packages/core/agent/src/runtime-types.ts:232-244 | waterfall，可替换 request config；模型请求配置在这里可路由 | I-02、I-10、I-16、I-17 |
-| agent/request-error | packages/core/agent/src/runtime-types.ts:246-260 | 失败恢复、重试或终止 | I-01、I-07、I-11、I-14 |
-| agent/turn-stopping | packages/core/agent/src/runtime-types.ts:262-278 | 串行、回合收尾前；可 steer 继续 | I-07、I-08、I-11 |
-| agent/error | packages/core/agent/src/runtime-types.ts:279-290 | 统一错误证据与异常控制 | I-01、I-07、I-11 |
-| agent.inject | packages/core/agent/src/runtime-types.ts:135-143 | 排队进入下一次 pre-step 的 model-facing context，不唤醒 agent | I-02、I-05、I-18 |
-| agent.steer | packages/core/agent/src/runtime-types.ts:127-133 | 影响当前回合控制流 | I-02、I-07、I-11 |
+| 接缝                  | 源码位置                                             | 语义                                                                             | 直接支持的创新点                 |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------ |
+| agent/session-start | packages/core/agent/src/runtime-types.ts:206-217 | session 启动生命周期                                                                 | I-11、I-12、I-18           |
+| agent/pre-step      | packages/core/agent/src/runtime-types.ts:219-231 | waterfall，可替换 model-visible messages；payload 有 agent、messages、turn、step、signal | I-03、I-04、I-07、I-08、I-18 |
+| agent/request       | packages/core/agent/src/runtime-types.ts:232-244 | waterfall，可替换 request config；模型请求配置在这里可路由                                      | I-02、I-10、I-16、I-17      |
+| agent/request-error | packages/core/agent/src/runtime-types.ts:246-260 | 失败恢复、重试或终止                                                                     | I-01、I-07、I-11、I-14      |
+| agent/turn-stopping | packages/core/agent/src/runtime-types.ts:262-278 | 串行、回合收尾前；可 steer 继续                                                            | I-07、I-08、I-11           |
+| agent/error         | packages/core/agent/src/runtime-types.ts:279-290 | 统一错误证据与异常控制                                                                    | I-01、I-07、I-11           |
+| agent.inject        | packages/core/agent/src/runtime-types.ts:135-143 | 排队进入下一次 pre-step 的 model-facing context，不唤醒 agent                              | I-02、I-05、I-18           |
+| agent.steer         | packages/core/agent/src/runtime-types.ts:127-133 | 影响当前回合控制流                                                                      | I-02、I-07、I-11           |
 
 ### 5.2 模型请求与参数接缝
 
-| 接缝 | 源码位置 | 语义 | 直接支持的创新点 |
-|---|---|---|---|
-| buildRequest | packages/core/agent-loop/src/agent.ts:407-455 | 组装 prompt、调用 agent/request、生成最终请求 | I-03、I-10、I-17、I-18 |
-| request header | packages/core/agent-loop/src/agent.ts:458-494 | canonical header、request/header、request/context、deep-freeze | I-04、I-13、I-17 |
-| header equality/fold | packages/core/session/src/request-header.ts:1-70 | 从最新 request/header 折叠 canonical 配置并判断变化 | I-04、I-13 |
-| llm/stream | packages/llm/llm/src/index.ts:51-65 | 供应商无关的流事件；loop request 是只读/冻结对象 | I-13、I-14、I-16、I-17 |
-| call config | packages/llm/llm/src/call-config.ts:1-59 | provider、model、reasoning effort、sampling 属于 request-header 状态 | I-10、I-17 |
-| model capability | packages/llm/llm/src/types.ts:252-280 | reasoning effort 与 model info 的能力描述 | I-16、I-17 |
-| usage/reasoning blocks | packages/llm/llm/src/types.ts:53-63,127-141 | text/reasoning/tool blocks 与 cache、reasoning usage | I-03、I-13、I-14、I-17 |
+| 接缝                     | 源码位置                                             | 语义                                                            | 直接支持的创新点            |
+| ---------------------- | ------------------------------------------------ | ------------------------------------------------------------- | ------------------- |
+| buildRequest           | packages/core/agent-loop/src/agent.ts:407-455    | 组装 prompt、调用 agent/request、生成最终请求                             | I-03、I-10、I-17、I-18 |
+| request header         | packages/core/agent-loop/src/agent.ts:458-494    | canonical header、request/header、request/context、deep-freeze   | I-04、I-13、I-17      |
+| header equality/fold   | packages/core/session/src/request-header.ts:1-70 | 从最新 request/header 折叠 canonical 配置并判断变化                       | I-04、I-13           |
+| llm/stream             | packages/llm/llm/src/index.ts:51-65              | 供应商无关的流事件；loop request 是只读/冻结对象                               | I-13、I-14、I-16、I-17 |
+| call config            | packages/llm/llm/src/call-config.ts:1-59         | provider、model、reasoning effort、sampling 属于 request-header 状态 | I-10、I-17           |
+| model capability       | packages/llm/llm/src/types.ts:252-280            | reasoning effort 与 model info 的能力描述                           | I-16、I-17           |
+| usage/reasoning blocks | packages/llm/llm/src/types.ts:53-63,127-141      | text/reasoning/tool blocks 与 cache、reasoning usage            | I-03、I-13、I-14、I-17 |
 
 ### 5.3 工具执行接缝
 
-| 接缝 | 源码位置 | 语义 | 直接支持的创新点 |
-|---|---|---|---|
-| tools/pre-execute | packages/core/tools/src/index.ts:142-152,1463-1505 | waterfall，可 allow、deny、ask；否决会物化为工具错误结果 | I-01、I-02、I-07、I-08、I-09 |
-| tools/execute | packages/core/tools/src/index.ts:153-163 | 实际执行阶段 | I-01、I-07、I-11 |
-| tools/post-execute | packages/core/tools/src/index.ts:164-175 | 可接受、替换、阻断或追加上下文 | I-01、I-07、I-08、I-18 |
-| tools/result | packages/core/tools/src/index.ts:191-197 | 观察最终工具结果 | I-01、I-03、I-07、I-11 |
-| ToolGuard | packages/core/tools/src/index.ts:703-711 | 单调收敛到最终 deny 的守卫 | I-01、I-07、I-08 |
-| assistant→tool 顺序 | packages/core/agent-loop/src/agent.ts:332-400 | assistant message 后若有 tool call 就直接执行，没有通用 post-assistant review waterfall | I-07、I-11 的边界证据 |
+| 接缝                 | 源码位置                                               | 语义                                                                         | 直接支持的创新点                 |
+| ------------------ | -------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------ |
+| tools/pre-execute  | packages/core/tools/src/index.ts:142-152,1463-1505 | waterfall，可 allow、deny、ask；否决会物化为工具错误结果                                    | I-01、I-02、I-07、I-08、I-09 |
+| tools/execute      | packages/core/tools/src/index.ts:153-163           | 实际执行阶段                                                                     | I-01、I-07、I-11           |
+| tools/post-execute | packages/core/tools/src/index.ts:164-175           | 可接受、替换、阻断或追加上下文                                                            | I-01、I-07、I-08、I-18      |
+| tools/result       | packages/core/tools/src/index.ts:191-197           | 观察最终工具结果                                                                   | I-01、I-03、I-07、I-11      |
+| ToolGuard          | packages/core/tools/src/index.ts:703-711           | 单调收敛到最终 deny 的守卫                                                           | I-01、I-07、I-08           |
+| assistant→tool 顺序  | packages/core/agent-loop/src/agent.ts:332-400      | assistant message 后若有 tool call 就直接执行，没有通用 post-assistant review waterfall | I-07、I-11 的边界证据          |
 
 ### 5.4 会话、持久化与恢复接缝
 
-| 接缝 | 源码位置 | 语义 | 直接支持的创新点 |
-|---|---|---|---|
-| session/event | packages/core/session/src/index.ts:66-76 | post-commit append feed，适合追加可审计事实 | I-01、I-07、I-08、I-11、I-12、I-14 |
-| session/flush | packages/core/session/src/index.ts:78-85 | durability checkpoint，无通用 waterfall | I-11 的持久化底座，但不等于完整 checkpoint |
-| SessionStore.fork | packages/core/session/src/index.ts:1068-1095 | 从稳定前缀生成子 session，边界不能切开 open turn | I-06、I-07、I-11、I-12 |
-| durable SessionEventMap | packages/core/session/src/types.ts:252-335 | turn、step、message、tool、todo、request header/context 等持久事件 | I-01、I-06、I-07、I-08、I-11、I-12 |
-| checkpoint policy | packages/session/session-checkpoint-policy/src/index.ts:1-83 | 在 llm/stream、tools/execute、agent/pre-step 等路径 flush | I-11 的底座证据，不能替代业务 checkpoint |
-| compaction engine | packages/compaction/compaction/src/index.ts:87-169 | 压力触发、压缩区域、替换为 summary node | I-03、I-04、I-11 |
-| compaction checkpoint | packages/compaction/compaction/src/checkpoint.ts:19-50 | 记录压缩来源和 compaction ID | I-04、I-11 |
+| 接缝                      | 源码位置                                                         | 语义                                                       | 直接支持的创新点                      |
+| ----------------------- | ------------------------------------------------------------ | -------------------------------------------------------- | ----------------------------- |
+| session/event           | packages/core/session/src/index.ts:66-76                     | post-commit append feed，适合追加可审计事实                        | I-01、I-07、I-08、I-11、I-12、I-14 |
+| session/flush           | packages/core/session/src/index.ts:78-85                     | durability checkpoint，无通用 waterfall                      | I-11 的持久化底座，但不等于完整 checkpoint |
+| SessionStore.fork       | packages/core/session/src/index.ts:1068-1095                 | 从稳定前缀生成子 session，边界不能切开 open turn                        | I-06、I-07、I-11、I-12           |
+| durable SessionEventMap | packages/core/session/src/types.ts:252-335                   | turn、step、message、tool、todo、request header/context 等持久事件 | I-01、I-06、I-07、I-08、I-11、I-12 |
+| checkpoint policy       | packages/session/session-checkpoint-policy/src/index.ts:1-83 | 在 llm/stream、tools/execute、agent/pre-step 等路径 flush      | I-11 的底座证据，不能替代业务 checkpoint  |
+| compaction engine       | packages/compaction/compaction/src/index.ts:87-169           | 压力触发、压缩区域、替换为 summary node                               | I-03、I-04、I-11                |
+| compaction checkpoint   | packages/compaction/compaction/src/checkpoint.ts:19-50       | 记录压缩来源和 compaction ID                                    | I-04、I-11                     |
 
 ### 5.5 Prompt、计划、技能与动态上下文接缝
 
-| 接缝 | 源码位置 | 语义 | 直接支持的创新点 |
-|---|---|---|---|
-| system-prompt/assemble | packages/core/system-prompt/src/index.ts:18-37,457-542 | 汇总 global/scoped sections、context、tool schemas，canonical sort 后 waterfall 组装 | I-03、I-04、I-05、I-12、I-13、I-18 |
-| system prompt section/context | packages/core/system-prompt/src/index.ts:373-407 | 注册结构化 section 和 context | I-04、I-05、I-12、I-18 |
-| plan mode | packages/plan/plan-mode/src/index.ts:46-54,180-265,425-460 | durable plan/mode，accepted pre-step 后应用；是软指导，不是完整 PlanGraph | I-06 |
-| goal | packages/goal/goal/src/types.ts:15-83；packages/goal/goal/src/domain.ts:61-67 | goal revision、phase、snapshot、goal/change | I-06、I-11 |
-| skills | packages/skill/skill/src/index.ts:38-101,284-297 | SkillSource、InvocationPolicy、SkillDefinition、registry 和 change 事件 | I-02、I-09、I-12 |
-| filesystem skill provider | packages/skill/skill-filesystem/src/index.ts:1-7,45-89,129-143 | 文件技能 provider、配置和 watch | I-09 |
-| agent-instructions | packages/context/agent-instructions/src/index.ts:1-7,322-366 | 文件触碰后生成 projection，在 pre-step 组合 context | I-05、I-18 |
-| time-context | packages/context/time-context/src/index.ts:139-208 | 带 source/plugin/form/sections 的动态快照；调用 next 后按时效注入 | I-18 |
+| 接缝                            | 源码位置                                                                         | 语义                                                                           | 直接支持的创新点                      |
+| ----------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------- |
+| system-prompt/assemble        | packages/core/system-prompt/src/index.ts:18-37,457-542                       | 汇总 global/scoped sections、context、tool schemas，canonical sort 后 waterfall 组装 | I-03、I-04、I-05、I-12、I-13、I-18 |
+| system prompt section/context | packages/core/system-prompt/src/index.ts:373-407                             | 注册结构化 section 和 context                                                      | I-04、I-05、I-12、I-18           |
+| plan mode                     | packages/plan/plan-mode/src/index.ts:46-54,180-265,425-460                   | durable plan/mode，accepted pre-step 后应用；是软指导，不是完整 PlanGraph                  | I-06                          |
+| goal                          | packages/goal/goal/src/types.ts:15-83；packages/goal/goal/src/domain.ts:61-67 | goal revision、phase、snapshot、goal/change                                     | I-06、I-11                     |
+| skills                        | packages/skill/skill/src/index.ts:38-101,284-297                             | SkillSource、InvocationPolicy、SkillDefinition、registry 和 change 事件            | I-02、I-09、I-12                |
+| filesystem skill provider     | packages/skill/skill-filesystem/src/index.ts:1-7,45-89,129-143               | 文件技能 provider、配置和 watch                                                      | I-09                          |
+| agent-instructions            | packages/context/agent-instructions/src/index.ts:1-7,322-366                 | 文件触碰后生成 projection，在 pre-step 组合 context                                     | I-05、I-18                     |
+| time-context                  | packages/context/time-context/src/index.ts:139-208                           | 带 source/plugin/form/sections 的动态快照；调用 next 后按时效注入                           | I-18                          |
 
 ### 5.6 评估中的接缝使用原则
 
@@ -629,4 +630,3 @@ v0.3 不能只以“测试数量增加”验收，应同时满足：
 确定：v0.3 的最小正确方向是 I-07 风险与证据审查、I-08 范围契约、I-11 可追溯 checkpoint、I-10/I-17 能力感知路由、I-03 软预算，以及先修正 pre-step waterfall。I-15 保留研究隔离，I-13/I-16 先做基准和探针，不进入默认核心路径。
 
 不确定：四插件在用户实际 dsh 安装中的监听器顺序和所有组合路径；需补一条真实 dsh 安装、启动、工具调用、失败、flush、暂停、fork、恢复的 A0 级 smoke/E2E 测试后，才能把当前若干 A1 结论提升为 A0。
-
