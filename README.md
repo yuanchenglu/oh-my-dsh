@@ -1,8 +1,8 @@
 # oh-my-dsh
 
-> DeepSeek Harness (dsh) 认知层插件合集 —— 让 DeepSeek 模型「该省的省、该花的花、不乱来」
+> DeepSeek Harness (dsh) 认知与安全基线插件合集 —— 让 Agent「该省的省、该花的花、不乱来」
 
-一条命令给你的 DeepSeek Harness 装上四层「认知脑」：**意图路由、模型路由、认知护栏、约束免疫**。装之前，你的 Agent 无论任务大小都一个样；装之后，它知道什么时候图便宜、什么时候下血本、什么时候闭嘴不乱来。
+一条命令给你的 DeepSeek Harness 装上七个可组合插件：意图路由、模型路由、认知护栏、约束免疫、范围契约、checkpoint 追踪、风险审查。v0.3 的重点是可组合、可拒绝、可审计、可恢复，而不是增加更多提示词。
 
 ---
 
@@ -12,32 +12,35 @@
 
 **你遇到的问题**：给 Agent 派个「把 1+1 算出来」「改个错别字」这种两秒钟的活，它照样启动满血深度推理，Token 哗哗烧。一个月下来，钱大多花在了本不该花的地方。
 
-**装上之后**：**model-router** 默认让 Agent 用便宜的 Flash 模型，只有真遇到复杂任务才自动升级到 Pro。简单任务省 Token，复杂任务保质量——钱花在刀刃上。（真实验证：简单问答走 `deepseek-v4-flash`，架构设计任务自动切 `deepseek-v4-pro`。）
+**装上之后**：**model-router** 默认让 Agent 用便宜的 Flash 模型，只有真遇到复杂任务才自动升级到 Pro。A1 桩测试已验证升级条件；A0 真实 dsh 运行需要外部 dsh 二进制和 API key。
 
 ### 场景二：Agent 智商不在线 —— 该深想的时候浅尝辄止
 
 **你遇到的问题**：让它做系统架构设计、技术选型这种要深思熟虑的活，它却跟做普通问答一样浅想两下就交卷，方案漏洞百出。
 
-**装上之后**：**intent-router** 自动识别任务意图——架构设计、深度调研这类任务自动把推理强度拉满（`reasoningEffort: max`），简单修改变成轻推理。**该深想的时候绝不敷衍。**
+**装上之后**：**intent-router** 识别任务意图，并把请求的推理强度与模型实际 capability 对账；不支持时记录降级原因，不假装请求已生效。
 
 ### 场景三：Agent 乱来 —— 说错话、做错事、越界串戏
 
 **你遇到的问题**：Agent 偶尔跑偏——该诚实说不知道的时候瞎编;该收敛任务范围的时候擅自加戏;你明令「不许删数据库」它还敢动手。
 
 **装上之后**：
-- **cognition-gate** 每轮注入三层认知护栏（荣辱观/思维方式/三省吾身），让 Agent 保持诚实、假设先行、主动质疑。
+- **cognition-gate** 每轮注入可配置的 L1/L2 与 I-02/I-08 认知提示，让 Agent 保持诚实、假设先行、主动质疑。
 - **constraint-immune** 听懂你的硬约束（「不能删 X」「必须先备份」），违规就提醒，甚至能在工具执行前**直接拦截**——它想 `rm` 都会被拦下来。
 
 ---
 
-## 包含的四个插件
+## 包含的七个插件
 
 | 插件 | 一句话 | 干的活 |
 |------|--------|--------|
 | **intent-router** | 意图路由 | 识别任务类型 → 自动设置推理强度 |
 | **model-router** | 模型路由 | Flash-first，复杂任务自动升 Pro |
-| **cognition-gate** | 认知护栏 | 每轮注入三层认知导航，防跑偏 |
+| **cognition-gate** | 认知护栏 | 每轮注入可配置认知提示，防跑偏 |
 | **constraint-immune** | 约束免疫 | 听懂硬约束，违规提醒 + 工具拦截 |
+| **scope-guard** | 范围契约 | 高置信范围变化需确认，越界工具 deny |
+| **checkpoint-trace** | 存档追踪 | sidecar JSONL、workspace digest、SHA-256 链 |
+| **review-router** | 风险审查 | 共享 R0-R4 风险模型，M0/M1/M4 裁决 |
 
 ---
 
@@ -47,7 +50,7 @@
 dsh plugin add oh-my-dsh
 ```
 
-装完即用，四个插件默认全部开启。也可以只装其中几个（见下方「单独安装 / 配置」）。
+装完即用，七个插件默认全部开启。也可以只装其中几个（见下方「单独安装 / 配置」）。
 
 ## 配置
 
@@ -107,7 +110,7 @@ oh-my-dsh 是**插件合集**，不是闭死的一整盒。每个插件都是独
 
 ### intent-router —— 意图路由
 
-**功能清单**：识别 7+1 类意图（重构/新建/中等改动/协作/架构/调研/简单修改/兜底）→ 按意图设置 `reasoningEffort` 和 token 预算。
+**功能清单**：识别 7+1 类意图（重构/新建/中等改动/协作/架构/调研/简单修改/兜底）→ 按意图设置 `reasoningEffort`。
 
 **它解决什么**：
 - **场景**：你同时派「重构 Module A」和「改个 typo」两个任务。以前都一个强度，重构本该深思熟虑却浅做，typo 本该秒回却深度推理。
@@ -125,7 +128,7 @@ oh-my-dsh 是**插件合集**，不是闭死的一整盒。每个插件都是独
 
 ### cognition-gate —— 认知护栏
 
-**功能清单**：每轮向模型注入三层认知导航——L1 荣辱观（诚实、不忽悠）、L2 思维方式（假设先行、第一性原理）、L3 三省吾身（反思改进）。
+**功能清单**：每轮向模型注入可配置认知提示——L1/L2（诚实、假设先行、第一性原理）与 I-02/I-08（主动质疑、复盘改进）。
 
 **它解决什么**：
 - **场景**：Agent 明明不确定却装懂、不先讲假设就动手、从不反思自己的失误。
@@ -145,7 +148,32 @@ oh-my-dsh 是**插件合集**，不是闭死的一整盒。每个插件都是独
 
 ---
 
-## v0.2 Release Notes
+## v0.3 Release Notes
+
+- 版本升级到 0.3.0，兼容声明收窄到 dsh 0.1.0-rc.*；已按 dsh 源码基线 47f943859 做静态与桩验证。
+- 新增 scope-guard、checkpoint-trace、review-router 三个插件；checkpoint 事实只写 sidecar，不写 session.append。
+- intent-router 增加 capability 对账；model-router 按 message.id 去重并记录 strategy 事实。
+- cognition-gate 增加 stable/evidence/active/external 四区软预算与 pressure 事实；不做驱逐或精确计费。
+- headless 无 approval answerer 时，M4 ask 按 fail-closed 语义降级 deny；本工作区 A0 真实 dsh 因缺少 dsh 与 API key 暂为 blocked。
+
+### 创新点状态与证据等级
+
+| 创新点 | 状态 | 证据 |
+|---|---|---|
+| I-03 Attention Budget | 半做 | A1：四区标签与 pressure，不含驱逐 |
+| I-07 Risk / Evidence Review | 半做 | A1：M0/M1/M4；A0 blocked |
+| I-08 Scope Change Governance | 半做 | A1：高置信契约与确认状态机 |
+| I-10 Intent to Strategy | 半做 | A1：8 意图与事实对账 |
+| I-11 Traceable Checkpoint | 半做 | A1：digest、hash 链、redaction |
+| I-17 Reasoning Effort Control | 半做 | A1：capability 对账；供应商语义不承诺 |
+| I-01 Agent Immune System | 半做 | A1：约束提醒与工具 deny，完整闭环未做 |
+| 其余创新点 | 未做/研究中 | 不在 v0.3 运行时范围 |
+
+### 兼容声明
+
+已按 dsh commit 47f943859（0.1.0-rc.5）源码接缝验证；peerDependencies 为 0.1.0-rc.*。rc 版本间可能存在破坏性 API 变化，升级前请重新运行真实 dsh smoke。
+
+## v0.2 历史 Release Notes
 
 - `constraint-immune` 默认行为从仅提醒变为**提醒 + 工具执行拦截**（`interception: deny`）；如需保持 v0.1 行为，配置 `interception: off`。
 - `model-router` 默认优先使用 `deepseek-v4-flash`，架构、研究、超长上下文或连续不满意时升级到 Pro。
