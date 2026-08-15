@@ -1,4 +1,5 @@
-import { contentToText } from '../shared/messages.js'
+import { contentToText, estimateTokens } from '../shared/messages.js'
+import { createZoneSection, tagZoneContent } from '../shared/context-zones.js'
 
 /** 首轮完整注入文本 */
 export const FULL_INJECTION = `[L1 荣辱观] 以知道自己的不足为荣、以提升认知为荣、以告诉实情为荣。不确定就说不确定。
@@ -20,6 +21,7 @@ export interface InjectionConfig {
     i08: boolean
   }
   excludePatterns: string[]
+  pressureThreshold?: number
 }
 
 /** 按层配置过滤注入文本 */
@@ -55,6 +57,8 @@ export function injectCognition(
 ): unknown[] {
   const injection = buildInjection(turn, config)
   if (!injection) return [...messages]
+  const section = createZoneSection('stable', 'cognition-gate', 'session', estimateTokens([{ content: injection }]))
+  const taggedInjection = tagZoneContent(injection, section)
 
   const result = [...messages]
   for (let i = result.length - 1; i >= 0; i--) {
@@ -65,9 +69,9 @@ export function injectCognition(
       }
       // ContentBlock[] 保持数组结构、追加 text part（review Y4：JSON.stringify 会把图片 part 拍成文本）
       if (Array.isArray(msg.content)) {
-        result[i] = { ...msg, content: [...msg.content, { type: 'text', text: '\n\n' + injection }] }
+        result[i] = { ...msg, content: [...msg.content, { type: 'text', text: '\n\n' + taggedInjection }] }
       } else {
-        result[i] = { ...msg, content: contentToText(msg.content) + '\n\n' + injection }
+        result[i] = { ...msg, content: contentToText(msg.content) + '\n\n' + taggedInjection }
       }
       return result
     }
