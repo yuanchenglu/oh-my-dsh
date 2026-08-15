@@ -40,8 +40,10 @@ export function apply(ctx: Context, config: Config) {
   const sessions = new Map<string, { constraints: Map<string, StoredConstraint>; checkedUpTo: number }>()
 
   ctx.on('agent/pre-step', async (payload: PreStepPayload, next: () => Promise<PreStepDecision>): Promise<PreStepDecision> => {
-    const { messages, turn, signal } = payload
-    if (signal.aborted) return next()
+    const { turn, signal } = payload
+    const decision = await next()
+    if (decision.kind === 'reject' || signal.aborted) return decision
+    const messages = decision.messages as Array<{ role?: string; content?: unknown }>
 
     // 会话 key 优先用 agent 的 session id；拿不到则退化为全局单桶（不隔离，v0.1 可接受）
     const sessionId = payload.agent?.id != null ? String(payload.agent.id) : 'default'
@@ -77,7 +79,7 @@ export function apply(ctx: Context, config: Config) {
             role: 'user' as const,
             content: `[约束提醒] 检测到可能违反硬约束："${matched}"。请确保不违反此约束。`,
           }
-          return { kind: 'enter', messages: [...messages, reminder] }
+          return { kind: 'enter', messages: [...decision.messages, reminder] }
         }
       }
     }
@@ -98,12 +100,12 @@ export function apply(ctx: Context, config: Config) {
           role: 'user' as const,
           content: `[约束提醒] 检测到可能未执行硬约束："${stored.raw}"。请确认已执行。`,
         }
-        return { kind: 'enter', messages: [...messages, reminder] }
+        return { kind: 'enter', messages: [...decision.messages, reminder] }
       }
     }
 
     session.checkedUpTo = messages.length
-    return next()
+    return decision
   })
 
   // 执行时拦截：工具派发前检查工具名与参数是否命中否定型约束关键词。
