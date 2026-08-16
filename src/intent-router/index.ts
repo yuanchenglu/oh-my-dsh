@@ -8,7 +8,7 @@ import { DEFAULT_EFFORT_MAP, DEFAULT_STRATEGIES, type StrategyDecision } from '.
 import type { Session } from '@deepseek-ai/dsh-session'
 
 export const name = 'intent-router'
-// 不声明 inject：agent/request 是事件挂钩，事件监听器在 agent 服务注册前挂上即可触发（v0.1 实测 inject 会导致加载顺序死锁）
+// 不声明 inject：agent/request 是事件挂钩；运行时通过 ctx.get 读取已激活的 llm，避免加载顺序死锁。
 
 export interface Config {
   enabled: boolean
@@ -73,13 +73,16 @@ export function apply(ctx: Context, config: Config) {
     let effectiveReasoningEffort: string | undefined = effort
     let fallbackReason: string | undefined
 
-    const resolver = ctx.llm?.resolveModelInfo
+    const llm = typeof ctx.get === 'function'
+      ? ctx.get('llm') as Context['llm'] | undefined
+      : ctx.llm
+    const resolver = llm?.resolveModelInfo
     if (typeof resolver !== 'function') {
       return { ...callConfig, reasoningEffort: effort }
     }
 
     try {
-      const info = await resolver.call(ctx.llm, callConfig.provider, callConfig.model, payload.signal)
+      const info = await resolver.call(llm, callConfig.provider, callConfig.model, payload.signal)
       const efforts = info.reasoning?.efforts?.map((item) => item.id) ?? []
       if (efforts.length === 0) {
         effectiveReasoningEffort = undefined

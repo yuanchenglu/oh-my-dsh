@@ -6,6 +6,7 @@ declare module '@deepseek-ai/cordis' {
   export interface Context {
     on(event: string, listener: (...args: never[]) => unknown): void
     effect(fn: () => (() => void) | void): void
+    get(name: string, strict?: boolean): unknown
     logger: {
       info(...args: unknown[]): void
       warn(...args: unknown[]): void
