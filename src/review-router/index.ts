@@ -74,20 +74,26 @@ export function apply(ctx: Context, config: Config) {
     return result
   })
 
-  ctx.on('tools/post-execute', (payload: { name: string; arguments: unknown; result?: unknown; agent?: { session?: Session } }) => {
+  ctx.on('tools/post-execute', (
+    payload: { name: string; arguments: unknown; agent?: { session?: Session } },
+    result: unknown,
+    next: () => Promise<unknown>,
+  ) => {
     const session = sessionOf(payload.agent)
-    if (!session?.header.cwd) return
-    const result = typeof payload.result === 'object' && payload.result !== null ? payload.result as Record<string, unknown> : {}
-    const assessment = assessRisk({ name: payload.name, arguments: payload.arguments, allowedPaths: config.allowedPaths ?? [session.header.cwd] })
-    const riskRecord = createRiskRecord(payload.name, assessment, [])
-    appendFact(session, 'oh-my-dsh/verdict', {
-      verdict: result.error || result.exitCode && result.exitCode !== 0 ? 'reject' : 'pass',
-      selectedReviewMode: riskRecord.selectedReviewMode,
-      evidenceRefs: [],
-      reason: 'tool result observed',
-      policyVersion: config.policyVersion,
-      riskRecord,
-    })
+    if (session?.header.cwd) {
+      const resultRecord = typeof result === 'object' && result !== null ? result as Record<string, unknown> : {}
+      const assessment = assessRisk({ name: payload.name, arguments: payload.arguments, allowedPaths: config.allowedPaths ?? [session.header.cwd] })
+      const riskRecord = createRiskRecord(payload.name, assessment, [])
+      appendFact(session, 'oh-my-dsh/verdict', {
+        verdict: resultRecord.error || resultRecord.isError || resultRecord.exitCode && resultRecord.exitCode !== 0 ? 'reject' : 'pass',
+        selectedReviewMode: riskRecord.selectedReviewMode,
+        evidenceRefs: [],
+        reason: 'tool result observed',
+        policyVersion: config.policyVersion,
+        riskRecord,
+      })
+    }
+    return next()
   })
 
   const failure = (payload: { agent?: { session?: Session } }) => {

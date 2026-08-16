@@ -65,4 +65,15 @@ describe('review-router M0/M1/M4', () => {
     expect(external.result).toEqual(expect.objectContaining({ kind: 'ask' }))
     expect(readFacts(session as never, 'oh-my-dsh/verdict').every((fact) => (fact.data as { selectedReviewMode: string }).selectedReviewMode === 'M4')).toBe(true)
   })
+
+  it('observes the real post-execute waterfall signature and continues', async () => {
+    const { session, ctx } = setup()
+    const next = vi.fn().mockResolvedValue({ kind: 'allow' })
+    await ctx.listener('tools/post-execute')({
+      name: 'bash', arguments: { command: 'printf ok' }, agent: { session },
+    }, { exitCode: 1 }, next)
+
+    expect(next).toHaveBeenCalledTimes(1)
+    expect(readFacts(session as never, 'oh-my-dsh/verdict')[0]?.data).toMatchObject({ verdict: 'reject' })
+  })
 })

@@ -61,11 +61,12 @@ export function apply(ctx: Context, config: Config) {
     states.set(key, state)
     if (state.sequence === 0) {
       const previous = readFacts(session, 'oh-my-dsh/checkpoint').filter((fact) => {
-        const data = fact.data as { checkpointId?: unknown; sequence?: unknown }
+        const data = fact.data as { checkpointId?: unknown; sequence?: unknown; workspaceDigest?: unknown }
         return typeof data.checkpointId === 'string'
-      }).at(-1)?.data as { checkpointId?: string; sequence?: number } | undefined
+      }).at(-1)?.data as { checkpointId?: string; sequence?: number; workspaceDigest?: string } | undefined
       state.lastCheckpointId = previous?.checkpointId
       state.sequence = previous?.sequence ?? 0
+      state.lastDigest = previous?.workspaceDigest
     }
     const paths = changedPaths(session.header.cwd ?? process.cwd())
     const checkpoint = createCheckpoint({
@@ -116,16 +117,22 @@ export function apply(ctx: Context, config: Config) {
     }
   })
 
-  ctx.on('tools/post-execute', (payload: { name: string; arguments: unknown; result?: unknown; agent?: { session?: Session } }) => {
+  ctx.on('tools/post-execute', (
+    payload: { name: string; arguments: unknown; agent?: { session?: Session } },
+    result: unknown,
+    next: () => Promise<unknown>,
+  ) => {
     const session = sessionOf(payload.agent)
     const test = isTestCommand(payload.name, payload.arguments)
-    if (!session || !test) return
-    const result = typeof payload.result === 'object' && payload.result !== null ? payload.result as Record<string, unknown> : {}
-    appendFact(session, 'oh-my-dsh/test-result', {
-      command: test.command,
-      exitCode: test.exitCode ?? (typeof result.exitCode === 'number' ? result.exitCode : typeof result.code === 'number' ? result.code : 0),
-      summary: test.summary ?? (typeof result.stderr === 'string' ? result.stderr.slice(0, 500) : undefined),
-    })
+    if (session && test) {
+      const resultRecord = typeof result === 'object' && result !== null ? result as Record<string, unknown> : {}
+      appendFact(session, 'oh-my-dsh/test-result', {
+        command: test.command,
+        exitCode: test.exitCode ?? (typeof resultRecord.exitCode === 'number' ? resultRecord.exitCode : typeof resultRecord.code === 'number' ? resultRecord.code : 0),
+        summary: test.summary ?? (typeof resultRecord.stderr === 'string' ? resultRecord.stderr.slice(0, 500) : undefined),
+      })
+    }
+    return next()
   })
 
   const lifecycle = (payload: { agent?: { session?: Session }; turn?: number; step?: number }) => {
