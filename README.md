@@ -150,23 +150,23 @@ oh-my-dsh 是**插件合集**，不是闭死的一整盒。每个插件都是独
 
 ## v0.3 Release Notes
 
-- 版本升级到 0.3.0，兼容声明收窄到 dsh 0.1.0-rc.*；已按 dsh 源码基线 47f943859 做静态与桩验证。
+- 版本升级到 0.3.0，兼容声明收窄到 dsh 0.1.0-rc.*；已按 dsh 源码基线 47f943859 做真实 A0 与 A1 验证。
 - 新增 scope-guard、checkpoint-trace、review-router 三个插件；checkpoint 事实只写 sidecar，不写 session.append。
 - intent-router 增加 capability 对账；model-router 按 message.id 去重并记录 strategy 事实。
 - cognition-gate 增加 stable/evidence/active/external 四区软预算与 pressure 事实；不做驱逐或精确计费。
-- headless 无 approval answerer 时，M4 ask 按 fail-closed 语义降级 deny；源码版 dsh 已完成安装、配置解析与 headless 挂载，但本工作区因缺少 API key 暂未完成 A0 会话。
+- headless 无 approval answerer 时，M4 ask 按 fail-closed 语义降级 deny；真实 dsh A0 已验证安装、headless 会话、工具拒绝、sidecar hash 链、resume 与 fork。若宿主 watcher 触发 `EMFILE`，烟测支持显式 `A0_DISABLE_HOST_WATCHERS=1` 资源隔离。
 
 ### 创新点状态与证据等级
 
 | 创新点 | 状态 | 证据 |
 |---|---|---|
 | I-03 Attention Budget | 半做 | A1：四区标签与 pressure，不含驱逐 |
-| I-07 Risk / Evidence Review | 半做 | A1：M0/M1/M4；A0 blocked |
+| I-07 Risk / Evidence Review | 半做 | A1：M0/M1/M4；A0：真实 headless fail-closed |
 | I-08 Scope Change Governance | 半做 | A1：高置信契约与确认状态机 |
 | I-10 Intent to Strategy | 半做 | A1：8 意图与事实对账 |
-| I-11 Traceable Checkpoint | 半做 | A1：digest、hash 链、redaction |
-| I-17 Reasoning Effort Control | 半做 | A1：capability 对账；供应商语义不承诺 |
-| I-01 Agent Immune System | 半做 | A1：约束提醒与工具 deny，完整闭环未做 |
+| I-11 Traceable Checkpoint | 半做 | A1：digest、hash 链、redaction；A0：resume/fork |
+| I-17 Reasoning Effort Control | 半做 | A1/A0：capability 对账；供应商语义不承诺 |
+| I-01 Agent Immune System | 半做 | A1/A0：约束提醒与真实工具 deny，完整闭环未做 |
 | 其余创新点 | 未做/研究中 | 不在 v0.3 运行时范围 |
 
 ### 兼容声明

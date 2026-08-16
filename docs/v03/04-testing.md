@@ -1,7 +1,7 @@
 # oh-my-dsh v0.3 测试体系文档
 
-> 基线：v0.2 的 111 个测试；v0.3 当前总计 151 个 A1 桩/单元测试。
-> A0 真实 dsh smoke 已提供；源码版 dsh 已通过安装、配置解析和 headless 帮助挂载预检，但 DEEPSEEK_API_KEY 缺失，完整真实运行状态仍是 blocked。
+> 基线：v0.2 的 111 个测试；v0.3 当前总计 153 个 A1 桩/单元测试。
+> A0 真实 dsh smoke 已通过；源码版 dsh 在显式隔离宿主 watcher 后完成真实模型、工具决策、sidecar、resume 与 fork 验证。
 
 ## TL;DR
 
@@ -9,10 +9,10 @@ v0.3 使用 TypeScript strict、vitest 和 Node 内置模块。每个 todo 先�
 
 ## 核心结论
 
-1. 151 个 A1 测试全绿，v0.2 的 111 个基线测试没有删除。
+1. 153 个 A1 测试全绿，v0.2 的 111 个基线测试没有删除。
 2. waterfall 组合测试验证 next 委托；checkpoint-trace 集成测试验证 deny 也有成对 checkpoint。
 3. R1 契约内 write 不会因为工具名 write 而无条件 ask；R3/R4 才进入 M4。
-4. A0 必须真实安装 dsh、运行 headless、验证 fail-closed、fork 和 resume；当前环境不满足前提，故不编造结果。
+4. A0 已真实安装 dsh、运行 headless，并验证 fail-closed、fork 和 resume；主机 watcher 资源限制通过显式隔离开关处理，未替换 dsh 的模型或工具链。
 
 ## 1. 测试金字塔
 
@@ -128,7 +128,7 @@ review-router 测试确认 R0 pass、R1 有 exitCode 0 的 testResults 时 pass�
 
 ### 5.1 A0 真实流程
 
-真实脚本 tests/e2e/real-dsh.smoke.ts 只从环境读取 DEEPSEEK_API_KEY，并创建临时 DSH_HOME。手册见 tests/e2e/real-dsh.smoke.md。预期流程：
+真实脚本 tests/e2e/real-dsh.smoke.ts 只从环境读取 DEEPSEEK_API_KEY，并创建临时 DSH_HOME。手册见 tests/e2e/real-dsh.smoke.md。流程为：
 
 ~~~sh
 corepack pnpm run build
@@ -152,24 +152,24 @@ DSH_HOME=临时目录 dsh --dump-config
 
 allow-once 不是发布门禁。测试 profile 可以注册 test-only approval answerer，验证 ask 到 allowed-once 的工具执行和 approval/asked、approval/decided 审计对。该支线不能替代 A0。
 
-### 5.3 当前 A0 结果
+### 5.3 A0 实际结果
 
-本工作区实际检查结果：
+本工作区实际检查结果（使用 `A0_DISABLE_HOST_WATCHERS=1` 隔离 dsh 宿主 watcher 资源限制）：
 
 ~~~text
 dsh source checkout: /Users/bluth/Code/deepseek-src/deepseek-harness @ 47f943859b
 real dsh plugin add: exit 0
 real dsh --dump-config: exit 0; seven oh-my-dsh rows in frozen order
-real dsh --profile headless --help: exit 0
-DEEPSEEK_API_KEY: absent
-real-dsh.smoke.js: exit 77, A0 BLOCKED
+real dsh headless basic/constraint/ask: exit 0; strategy、deny 和 fail-closed ask 断言通过
+real dsh resume/fork probe: exit 0; digest invalidation 与父 checkpoint 索引通过
+real-dsh.smoke.js: exit 0; checked=true; secret scan pass
 ~~~
 
-因此模型驱动的 headless 会话、工具决策、fork、resume 没有被声称为通过；headless 帮助挂载仅作为真实 dsh 预检。静态 package tarball 已验证 7 个 lib/src 插件入口。
+脚本仍只把 API key 作为环境变量传入；它扫描输出和新 sidecar，未发现 key 或 credential-shaped `sk-*` 值。`A0_DISABLE_HOST_WATCHERS=1` 是环境资源隔离，不是 oh-my-dsh 行为桩；真实模型请求、tools/pre-execute、tools/post-execute、sidecar 读写和 dsh session API 均实际执行。静态 package tarball 同时验证了 7 个 lib/src 插件入口。
 
 ## 6. 覆盖目标与回归
 
-- 新插件核心分支必须有 A1 用例；当前全量 151/151 通过。
+- 新插件核心分支必须有 A1 用例；当前全量 153/153 通过。
 - v0.2 的 111 个测试全保留；constraint-immune 的 19 个集成测试仍通过。
 - A0 与 A1 分开标注，不以静态文件检查替代运行时行为。
 - 所有 sidecar 事实测试使用临时目录，不写用户工作区和密钥。
@@ -213,4 +213,4 @@ tests/e2e/real-dsh.smoke.ts
 
 2026-08-15：确定 A0/A1 分层、sidecar resume 哨兵和 approval fail-closed 语义。
 
-2026-08-16：A1 151/151 全绿；A0 因外部运行条件缺失保持 blocked。
+2026-08-16：A1 153/153 全绿；A0 在真实 dsh 0.1.0-rc.5 上通过，记录了宿主 watcher 资源隔离条件。
